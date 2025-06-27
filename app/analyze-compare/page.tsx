@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { FileText, Plus, Loader2, CheckCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
@@ -161,7 +161,7 @@ function LoadingScreen({ progress }: LoadingScreenProps) {
   )
 }
 
-export default function AnalyzeComparePage() {
+function AnalyzeCompareContent() {
   const [boxes, setBoxes] = useState<string[]>(["box-1", "box-2", "box-3", "box-4"])
   const [files, setFiles] = useState<Record<string, UploadedFile | null>>({
     "box-1": null,
@@ -411,5 +411,13 @@ export default function AnalyzeComparePage() {
 
       {isAnalyzing && <LoadingScreen progress={progress} />}
     </>
+  )
+}
+
+export default function AnalyzeComparePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AnalyzeCompareContent />
+    </Suspense>
   )
 }
