@@ -2,8 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { FileText, Plus, Loader2, CheckCircle } from "lucide-react"
+import { useSearchParams } from "next/navigation"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
@@ -12,6 +13,8 @@ import { User } from "lucide-react"
 import Link from "next/link"
 import { processSBCDocuments } from "@/app/actions/process-sbc"
 import type { ProcessSBCResponse } from "@/lib/sbc-schema"
+import PolicyComparison from "@/components/policy-comparison"
+import { useAnalysisStore } from "@/lib/analysis-store"
 
 interface UploadedFile {
   name: string
@@ -169,11 +172,52 @@ export default function AnalyzeComparePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [analysisResults, setAnalysisResults] = useState<ProcessSBCResponse | null>(null)
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null)
+  
+  const searchParams = useSearchParams()
+  const { saveAnalysis, getAnalysis, loadAnalysisFromKV } = useAnalysisStore()
 
   const MAX_POLICIES = 8
   const uploadedFilesCount = Object.values(files).filter((file) => file !== null).length
   const canAddMore = boxes.length < MAX_POLICIES
   const canSubmit = uploadedFilesCount > 0
+
+  // Load saved analysis if analysis ID is provided in URL
+  useEffect(() => {
+    const analysisId = searchParams.get('analysis')
+    if (analysisId) {
+      // First check local storage
+      const savedAnalysis = getAnalysis(analysisId)
+      if (savedAnalysis) {
+        setAnalysisResults(savedAnalysis.results)
+        setCurrentAnalysisId(analysisId)
+      } else {
+        // If not found locally, try loading from KV
+        loadAnalysisFromKV(analysisId).then((analysis) => {
+          if (analysis) {
+            setAnalysisResults(analysis.results)
+            setCurrentAnalysisId(analysisId)
+          }
+        })
+      }
+    }
+  }, [searchParams, getAnalysis, loadAnalysisFromKV])
+
+  // Generate analysis name from successful results
+  const generateAnalysisName = (results: ProcessSBCResponse): string => {
+    const successfulResults = results.results.filter(r => r.success && r.data)
+    if (successfulResults.length === 0) return 'Analysis'
+    
+    const planNames = successfulResults.map(r => 
+      r.data!.planSummary.planName || r.fileName.replace('.pdf', '')
+    ).slice(0, 2) // Take first 2 plan names
+    
+    if (planNames.length === 1) {
+      return planNames[0]
+    } else {
+      return `${planNames.join(' vs ')}${successfulResults.length > 2 ? ` +${successfulResults.length - 2}` : ''}`
+    }
+  }
 
   const handleFileSelect = (boxId: string, fileList: FileList) => {
     const filesArray = Array.from(fileList).filter((file) => file.type === "application/pdf")
@@ -232,8 +276,8 @@ export default function AnalyzeComparePage() {
       const formData = new FormData()
       const uploadedFiles = Object.values(files).filter((file): file is UploadedFile => file !== null)
 
-      uploadedFiles.forEach((fileData, index) => {
-        formData.append(`file-${index}`, fileData.file)
+      uploadedFiles.forEach((fileData) => {
+        formData.append('files', fileData.file)
       })
 
       // Start progress simulation
@@ -256,18 +300,13 @@ export default function AnalyzeComparePage() {
         setIsAnalyzing(false)
         setProgress(0)
         setAnalysisResults(results)
-
-        // For now, show an alert with results summary
-        const successMsg = `Analysis complete!\n\nSuccessfully processed: ${results.successCount} files\nFailed: ${results.errorCount} files`
-
-        if (results.errorCount > 0) {
-          const failedFiles = results.results
-            .filter((r) => !r.success)
-            .map((r) => `${r.fileName}: ${r.error}`)
-            .join("\n")
-          alert(`${successMsg}\n\nFailed files:\n${failedFiles}`)
-        } else {
-          alert(successMsg)
+        
+        // Save analysis automatically if there are successful results
+        if (results.successCount > 0) {
+          const analysisName = generateAnalysisName(results)
+          saveAnalysis(analysisName, results).then((analysisId) => {
+            setCurrentAnalysisId(analysisId)
+          })
         }
       }, 1000)
     } catch (error) {
@@ -291,7 +330,28 @@ export default function AnalyzeComparePage() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {analysisResults && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setAnalysisResults(null)
+                  setCurrentAnalysisId(null)
+                  setFiles({
+                    "box-1": null,
+                    "box-2": null,
+                    "box-3": null,
+                    "box-4": null,
+                  })
+                  setBoxes(["box-1", "box-2", "box-3", "box-4"])
+                  // Clear URL params
+                  window.history.replaceState({}, '', '/analyze-compare')
+                }}
+              >
+                Start Over
+              </Button>
+            )}
             <Button variant="outline" size="sm" asChild>
               <Link href="/health-profile">
                 <User className="w-4 h-4 mr-2" />
@@ -301,48 +361,52 @@ export default function AnalyzeComparePage() {
           </div>
         </header>
 
-        <div className="flex-1 bg-gray-50">
-          <div className="max-w-6xl mx-auto px-4 py-12">
-            <div className="text-center mb-12">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">Analyze & Compare Health Insurance Policies</h1>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Upload your SBC documents to compare coverage options and benefits. You can upload up to {MAX_POLICIES}{" "}
-                policies.
-              </p>
-            </div>
+        {analysisResults ? (
+          <PolicyComparison results={analysisResults} />
+        ) : (
+          <div className="flex-1 bg-gray-50">
+            <div className="max-w-6xl mx-auto px-4 py-12">
+              <div className="text-center mb-12">
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">Analyze & Compare Health Insurance Policies</h1>
+                <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                  Upload your SBC documents to compare coverage options and benefits. You can upload up to {MAX_POLICIES}{" "}
+                  policies.
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {boxes.map((boxId) => (
-                <UploadBox
-                  key={boxId}
-                  id={boxId}
-                  file={files[boxId]}
-                  onFileSelect={(fileList) => handleFileSelect(boxId, fileList)}
-                  disabled={isAnalyzing}
-                />
-              ))}
-              {canAddMore && <AddMoreBox onAddMore={handleAddMore} disabled={isAnalyzing} />}
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                {boxes.map((boxId) => (
+                  <UploadBox
+                    key={boxId}
+                    id={boxId}
+                    file={files[boxId]}
+                    onFileSelect={(fileList) => handleFileSelect(boxId, fileList)}
+                    disabled={isAnalyzing}
+                  />
+                ))}
+                {canAddMore && <AddMoreBox onAddMore={handleAddMore} disabled={isAnalyzing} />}
+              </div>
 
-            <div className="text-center space-y-4">
-              {canSubmit && (
-                <Button onClick={handleSubmit} size="lg" disabled={isAnalyzing} className="min-w-[200px]">
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Analyze Policies
-                    </>
-                  )}
-                </Button>
-              )}
+              <div className="text-center space-y-4">
+                {canSubmit && (
+                  <Button onClick={handleSubmit} size="lg" disabled={isAnalyzing} className="min-w-[200px]">
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Analyze Policies
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </SidebarInset>
 
       {isAnalyzing && <LoadingScreen progress={progress} />}

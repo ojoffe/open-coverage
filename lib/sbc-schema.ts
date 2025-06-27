@@ -104,10 +104,12 @@ export interface ProcessingResult {
   fileName: string
   data?: SBCData
   error?: string
+  pdfUrl?: string
 }
 
 export interface ProcessSBCResponse {
   results: ProcessingResult[]
   successCount: number
   errorCount: number
+  analysisId?: string
 }

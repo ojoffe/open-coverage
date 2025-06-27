@@ -26,6 +26,7 @@ export default function RootLayout({
           <AppSidebar />
           {children}
         </SidebarProvider>
+        <script src="https://builder-sigma-ten.vercel.app/api/embed/asst_1750990823666_lea46d5fq" async></script>
       </body>
     </html>
   )
