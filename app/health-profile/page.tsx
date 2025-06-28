@@ -1,8 +1,7 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import * as React from "react"
+import { useState, useMemo } from "react"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
@@ -14,6 +13,18 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, X, User, Trash2 } from "lucide-react"
 import { useHealthProfileStore, type OtherService } from "@/lib/health-profile-store"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon, Baby } from "lucide-react"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+import { AIAutocomplete } from "@/components/ui/ai-autocomplete"
+import { commonConditions, commonMedications } from "@/lib/health-profile-utils"
+import { ProfileCompleteness } from "@/components/profile-completeness"
+import { UtilizationDisplay } from "@/components/utilization-display"
+import { calculateHealthcareUtilization, getPreventiveCareSchedule } from "@/lib/utilization-engine"
+import { useScreenReaderAnnouncement, ScreenReaderAnnouncement } from "@/lib/hooks/use-screen-reader"
 
 // Available medical services for selection - matching insurance policy categories
 const AVAILABLE_SERVICES = [
@@ -68,60 +79,6 @@ const AVAILABLE_SERVICES = [
   "Other (specify)"
 ]
 
-interface TagInputProps {
-  label: string
-  tags: string[]
-  onTagsChange: (tags: string[]) => void
-  placeholder: string
-}
-
-function TagInput({ label, tags, onTagsChange, placeholder }: TagInputProps) {
-  const [inputValue, setInputValue] = useState("")
-
-  const addTag = () => {
-    if (inputValue.trim() && !tags.includes(inputValue.trim())) {
-      onTagsChange([...tags, inputValue.trim()])
-      setInputValue("")
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    onTagsChange(tags.filter((tag) => tag !== tagToRemove))
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault()
-      addTag()
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-sm">{label}</Label>
-      <div className="flex gap-2">
-        <Input
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder={placeholder}
-          className="flex-1"
-        />
-        <Button type="button" onClick={addTag} size="sm">
-          Add
-        </Button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag) => (
-          <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-            {tag}
-            <X className="w-3 h-3 cursor-pointer" onClick={() => removeTag(tag)} />
-          </Badge>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 interface OtherServicesInputProps {
   services: OtherService[]
@@ -129,42 +86,46 @@ interface OtherServicesInputProps {
 }
 
 function OtherServicesInput({ services = [], onServicesChange }: OtherServicesInputProps) {
-  const [selectedService, setSelectedService] = useState("")
-  const [customServiceName, setCustomServiceName] = useState("")
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [frequency, setFrequency] = useState(1)
-  const [showCustomInput, setShowCustomInput] = useState(false)
   
-  // Get services that haven't been added yet (excluding already added services but keeping "Other")
-  const availableServices = AVAILABLE_SERVICES.filter(
-    service => service === "Other (specify)" || !services.some(s => s.name === service || s.name.startsWith(service))
-  )
-  
-  const handleServiceChange = (value: string) => {
-    setSelectedService(value)
-    setShowCustomInput(value === "Other (specify)")
-    if (value !== "Other (specify)") {
-      setCustomServiceName("")
-    }
-  }
-  
-  const addService = () => {
-    const serviceName = selectedService === "Other (specify)" ? customServiceName.trim() : selectedService
-    
-    if (serviceName && frequency > 0) {
-      // Check if this custom service already exists
-      if (services.some(s => s.name === serviceName)) {
-        return
-      }
+  // Convert AVAILABLE_SERVICES to options format
+  const serviceOptions = AVAILABLE_SERVICES
+    .filter(service => service !== "Other (specify)")
+    .map(service => {
+      const category = 
+        service.includes("Primary care") || service.includes("Preventive") ? "Primary & Preventive Care" :
+        service.includes("Diagnostic") || service.includes("Imaging") ? "Diagnostic & Imaging" :
+        service.includes("Generic") || service.includes("drugs") ? "Prescription Drugs" :
+        service.includes("Emergency") || service.includes("Urgent") ? "Emergency & Urgent Care" :
+        service.includes("surgery") || service.includes("surgeon") ? "Surgery & Hospital" :
+        service.includes("mental") || service.includes("behavioral") ? "Mental Health" :
+        service.includes("Delivery") || service.includes("maternity") ? "Maternity Care" :
+        service.includes("Rehabilitation") || service.includes("Habilitation") ? "Therapy" :
+        service.includes("Children") ? "Children's Services" :
+        "Other Services"
       
-      const newService: OtherService = {
-        name: serviceName,
-        frequency: frequency
+      return {
+        value: service,
+        label: service,
+        category: category
       }
-      onServicesChange([...services, newService])
-      setSelectedService("")
-      setCustomServiceName("")
-      setFrequency(1)
-      setShowCustomInput(false)
+    })
+  
+  const addServices = () => {
+    if (selectedServices.length > 0 && frequency > 0) {
+      const newServices = selectedServices
+        .filter(serviceName => !services.some(s => s.name === serviceName))
+        .map(serviceName => ({
+          name: serviceName,
+          frequency: frequency
+        }))
+      
+      if (newServices.length > 0) {
+        onServicesChange([...services, ...newServices])
+        setSelectedServices([])
+        setFrequency(1)
+      }
     }
   }
   
@@ -184,38 +145,26 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
   
   return (
     <div className="space-y-2">
-      <Label className="text-sm">Medical Services</Label>
-      <p className="text-xs text-gray-600 mb-2">Add any medical services you expect to use next year</p>
+      <Label className="text-sm font-medium">Medical Services</Label>
+      <p className="text-xs text-gray-700 dark:text-gray-300 mb-2">Add any medical services you expect to use next year</p>
       
       {/* Add new service form */}
       <div className="space-y-3">
         <div>
           <Label className="text-xs font-medium mb-1">Service</Label>
-          <Select value={selectedService} onValueChange={handleServiceChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select service..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableServices.map(service => (
-                <SelectItem key={service} value={service}>
-                  {service}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AIAutocomplete
+            options={serviceOptions}
+            value={selectedServices}
+            onChange={setSelectedServices}
+            placeholder="Search or select services..."
+            searchPlaceholder="Search services (AI-powered)..."
+            emptyText="No services found."
+            searchType="services"
+            allowCustom={true}
+            customLabel="Add service"
+            multiple={true}
+          />
         </div>
-        
-        {showCustomInput && (
-          <div>
-            <Label className="text-xs font-medium mb-1">Custom Service Name</Label>
-            <Input
-              value={customServiceName}
-              onChange={(e) => setCustomServiceName(e.target.value)}
-              placeholder="Enter service name..."
-              className="w-full"
-            />
-          </div>
-        )}
         
         <div>
           <Label className="text-xs font-medium mb-1">Frequency/year</Label>
@@ -232,12 +181,12 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
         
         <Button 
           type="button" 
-          onClick={addService} 
+          onClick={addServices} 
           size="sm"
           className="w-full"
-          disabled={(!selectedService && !customServiceName) || availableServices.length === 0}
+          disabled={selectedServices.length === 0}
         >
-          Add Service
+          Add Service{selectedServices.length > 1 ? 's' : ''}
         </Button>
       </div>
       
@@ -245,7 +194,7 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
       {services.length > 0 && (
         <div className="space-y-2 mt-4">
           {services.map((service) => (
-            <div key={service.name} className="flex items-center justify-between bg-gray-50 p-3 rounded">
+            <div key={service.name} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
               <span className="text-sm flex-1 pr-2">{service.name}</span>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Input
@@ -256,7 +205,7 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
                   onChange={(e) => updateServiceFrequency(service.name, parseInt(e.target.value) || 0)}
                   className="w-16 h-7 text-sm"
                 />
-                <span className="text-xs text-gray-500 whitespace-nowrap">/yr</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap" aria-label="per year">/yr</span>
                 <X 
                   className="w-4 h-4 cursor-pointer text-gray-500 hover:text-red-500 ml-1" 
                   onClick={() => removeService(service.name)} 
@@ -276,9 +225,75 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
 
 export default function HealthProfilePage() {
   const { members, addMember, removeMember, updateMember, clearProfile } = useHealthProfileStore()
+  const [pregnancyDueDates, setPregnancyDueDates] = useState<Record<string, Date | undefined>>({})
+  const [showUtilization, setShowUtilization] = useState(false)
+  const { announce, announcementRef } = useScreenReaderAnnouncement()
+  
+  // Memoize healthcare utilization calculation for primary member
+  const primaryMemberUtilization = useMemo(() => {
+    if (members.length > 0 && members[0].age) {
+      return calculateHealthcareUtilization(members[0])
+    }
+    return null
+  }, [members])
+  
+  // Auto-show utilization if member has sufficient data
+  React.useEffect(() => {
+    if (members.length > 0 && members[0] && members[0].age && members[0].conditions && members[0].conditions.length > 0) {
+      setShowUtilization(true)
+    }
+  }, [members])
+  
+  // Calculate profile completeness for basic profile
+  const calculateBasicCompleteness = (member: any) => {
+    const demographics = [
+      member.age ? 25 : 0,
+      member.gender && member.gender !== 'prefer_not_to_say' ? 25 : 0,
+      member.height ? 25 : 0,
+      member.weight ? 25 : 0,
+    ].reduce((a, b) => a + b, 0)
+    
+    const conditions = member.conditions.length > 0 ? 100 : 0
+    const medications = member.medications.length > 0 ? 100 : 0
+    const providers = 0 // Not implemented in basic profile
+    const history = 0 // Not implemented in basic profile
+    const preferences = [
+      member.otherServices?.length > 0 ? 25 : 0,
+      member.smokingStatus && member.smokingStatus !== 'unknown' ? 25 : 0,
+      member.alcoholUse && member.alcoholUse !== 'unknown' ? 25 : 0,
+      member.exerciseFrequency ? 25 : 0,
+    ].reduce((a, b) => a + b, 0)
+    
+    const overall = (demographics + conditions + medications + providers + history + preferences) / 6
+    
+    return {
+      overall: isNaN(overall) ? 0 : overall,
+      categories: {
+        demographics: isNaN(demographics) ? 0 : demographics,
+        conditions: isNaN(conditions) ? 0 : conditions,
+        medications: isNaN(medications) ? 0 : medications,
+        providers: isNaN(providers) ? 0 : providers,
+        history: isNaN(history) ? 0 : history,
+        preferences: isNaN(preferences) ? 0 : preferences,
+      }
+    }
+  }
+
+  // Handle member addition with announcement
+  const handleAddMember = () => {
+    addMember()
+    announce(`New family member added. Total members: ${members.length + 1}`)
+  }
+
+  // Handle member removal with announcement
+  const handleRemoveMember = (memberId: string, index: number) => {
+    removeMember(memberId)
+    announce(`Member ${index + 1} removed. Total members: ${members.length - 1}`)
+  }
 
   return (
     <SidebarInset>
+      <ScreenReaderAnnouncement announcementRef={announcementRef} />
       <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
         <SidebarTrigger className="-ml-1" />
         <Separator orientation="vertical" className="mr-2 h-4" />
@@ -292,7 +307,7 @@ export default function HealthProfilePage() {
       </header>
 
       <div className="flex-1 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="mb-8 flex justify-between items-start">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Health Profile</h1>
@@ -306,7 +321,17 @@ export default function HealthProfilePage() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* Profile Completeness Summary */}
+          {members.length > 0 && members[0] && (
+            <div className="mb-6">
+              <ProfileCompleteness 
+                {...calculateBasicCompleteness(members[0])}
+                memberName={members[0].age ? `Primary Member (Age ${members[0].age})` : "Primary Member"}
+              />
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
             {members.map((member, index) => (
               <Card key={member.id} className="h-fit">
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -315,37 +340,450 @@ export default function HealthProfilePage() {
                     {index === 0 ? "Primary Member" : `Member ${index + 1}`}
                   </CardTitle>
                   {members.length > 1 && (
-                    <Button variant="outline" size="sm" onClick={() => removeMember(member.id)}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleRemoveMember(member.id, index)}
+                      aria-label={`Remove ${index === 0 ? "Primary Member" : `Member ${index + 1}`}`}
+                    >
                       <X className="w-4 h-4" />
                     </Button>
                   )}
                 </CardHeader>
                 <CardContent className="space-y-4 pt-0">
-                  <div>
-                    <Label htmlFor={`age-${member.id}`} className="text-sm">Age</Label>
-                    <Input
-                      id={`age-${member.id}`}
-                      type="number"
-                      value={member.age}
-                      onChange={(e) => updateMember(member.id, { age: e.target.value })}
-                      placeholder="Age"
-                      className="mt-1"
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`age-${member.id}`} className="text-sm">Age</Label>
+                      <Input
+                        id={`age-${member.id}`}
+                        type="number"
+                        value={member.age}
+                        onChange={(e) => updateMember(member.id, { age: e.target.value })}
+                        placeholder="Age"
+                        className="mt-1"
+                        aria-label="Member age"
+                        aria-describedby={`age-desc-${member.id}`}
+                        min="0"
+                        max="120"
+                      />
+                      <span id={`age-desc-${member.id}`} className="sr-only">Enter age between 0 and 120 years</span>
+                    </div>
+                    <div>
+                      <Label htmlFor={`gender-${member.id}`} className="text-sm">Gender</Label>
+                      <Select 
+                        value={member.gender || 'prefer_not_to_say'} 
+                        onValueChange={(value) => updateMember(member.id, { gender: value })}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                          <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {/* Height, Weight, BMI */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor={`height-${member.id}`} className="text-sm">Height</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1">
+                          <Input
+                            id={`height-feet-${member.id}`}
+                            type="number"
+                            value={member.height ? Math.floor(member.height / 12) : ''}
+                            onChange={(e) => {
+                              const feet = parseInt(e.target.value) || 0
+                              const inches = member.height ? member.height % 12 : 0
+                              const totalInches = feet * 12 + inches
+                              updateMember(member.id, { 
+                                height: totalInches,
+                                bmi: member.weight && totalInches ? 
+                                  Number(((member.weight / (totalInches * totalInches)) * 703).toFixed(1)) : undefined
+                              })
+                            }}
+                            placeholder="5"
+                            className="w-14 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            aria-label="Height in feet"
+                            min="0"
+                            max="8"
+                          />
+                          <span className="text-sm text-gray-500">ft</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            id={`height-inches-${member.id}`}
+                            type="number"
+                            value={member.height ? member.height % 12 : ''}
+                            onChange={(e) => {
+                              const inches = parseInt(e.target.value) || 0
+                              const feet = member.height ? Math.floor(member.height / 12) : 0
+                              const totalInches = feet * 12 + inches
+                              updateMember(member.id, { 
+                                height: totalInches,
+                                bmi: member.weight && totalInches ? 
+                                  Number(((member.weight / (totalInches * totalInches)) * 703).toFixed(1)) : undefined
+                              })
+                            }}
+                            placeholder="10"
+                            className="w-14 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            aria-label="Height in inches"
+                            min="0"
+                            max="11"
+                          />
+                          <span className="text-sm text-gray-500">in</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor={`weight-${member.id}`} className="text-sm">Weight</Label>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Input
+                          id={`weight-${member.id}`}
+                          type="number"
+                          value={member.weight || ''}
+                          onChange={(e) => {
+                            const weight = parseFloat(e.target.value) || 0
+                            updateMember(member.id, { 
+                              weight,
+                              bmi: weight && member.height ? 
+                                Number(((weight / (member.height * member.height)) * 703).toFixed(1)) : undefined
+                            })
+                          }}
+                          placeholder="150"
+                          className="flex-1 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          aria-label="Weight in pounds"
+                          min="0"
+                          max="1000"
+                        />
+                        <span className="text-sm text-gray-500 whitespace-nowrap">lbs</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm">BMI</Label>
+                      <div className="mt-1 h-10 px-3 py-2 bg-gray-100 rounded-md flex items-center">
+                        {member.bmi ? (
+                          <span className={cn(
+                            "font-medium",
+                            member.bmi < 18.5 ? "text-blue-600" :
+                            member.bmi < 25 ? "text-green-600" :
+                            member.bmi < 30 ? "text-yellow-600" : "text-red-600"
+                          )}>
+                            {member.bmi} 
+                            <span className="text-xs ml-1">
+                              ({member.bmi < 18.5 ? "Underweight" :
+                                member.bmi < 25 ? "Normal" :
+                                member.bmi < 30 ? "Overweight" : "Obese"})
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 text-sm">Auto-calculated</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lifestyle Factors */}
+                  <div className="space-y-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="text-sm font-medium mb-2">Lifestyle Factors</h4>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <Label className="text-sm">Smoking Status</Label>
+                        <Select 
+                          value={member.smokingStatus || 'unknown'} 
+                          onValueChange={(value) => updateMember(member.id, { smokingStatus: value as any })}
+                        >
+                          <SelectTrigger className="mt-1 w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="never">Never smoked</SelectItem>
+                            <SelectItem value="former">Former smoker</SelectItem>
+                            <SelectItem value="current">Current smoker</SelectItem>
+                            <SelectItem value="unknown">Prefer not to say</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Alcohol Use</Label>
+                        <Select 
+                          value={member.alcoholUse || 'unknown'} 
+                          onValueChange={(value) => updateMember(member.id, { alcoholUse: value as any })}
+                        >
+                          <SelectTrigger className="mt-1 w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="moderate">Moderate (1-2 drinks/day)</SelectItem>
+                            <SelectItem value="heavy">Heavy (3+ drinks/day)</SelectItem>
+                            <SelectItem value="unknown">Prefer not to say</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-sm">Exercise Frequency</Label>
+                        <Select 
+                          value={member.exerciseFrequency || 'occasional'} 
+                          onValueChange={(value) => updateMember(member.id, { exerciseFrequency: value as any })}
+                        >
+                          <SelectTrigger className="mt-1 w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sedentary</SelectItem>
+                            <SelectItem value="occasional">Occasional (1-2x/week)</SelectItem>
+                            <SelectItem value="regular">Regular (3-4x/week)</SelectItem>
+                            <SelectItem value="daily">Daily</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {member.gender === 'female' && (
+                    <div className="space-y-3 p-3 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Baby className="w-4 h-4 text-pink-600" />
+                        <span>Pregnancy Information</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm">Pregnancy Status</Label>
+                          <Select 
+                            value={member.pregnancyStatus?.isPregnant ? 'yes' : 'no'} 
+                            onValueChange={(value) => {
+                              if (value === 'no') {
+                                updateMember(member.id, { pregnancyStatus: undefined })
+                                setPregnancyDueDates(prev => ({ ...prev, [member.id]: undefined }))
+                              } else {
+                                updateMember(member.id, { 
+                                  pregnancyStatus: { 
+                                    isPregnant: true,
+                                    dueDate: pregnancyDueDates[member.id]?.toISOString(),
+                                    isHighRisk: false,
+                                    multiples: false,
+                                    plannedDeliveryType: 'unknown'
+                                  } 
+                                })
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="no">Not pregnant</SelectItem>
+                              <SelectItem value="yes">Currently pregnant</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {member.pregnancyStatus?.isPregnant && (
+                          <div>
+                            <Label className="text-sm">Due Date</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !pregnancyDueDates[member.id] && "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {pregnancyDueDates[member.id] ? (
+                                    format(pregnancyDueDates[member.id]!, "PPP")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={pregnancyDueDates[member.id]}
+                                  onSelect={(date) => {
+                                    setPregnancyDueDates(prev => ({ ...prev, [member.id]: date }))
+                                    if (date && member.pregnancyStatus) {
+                                      updateMember(member.id, {
+                                        pregnancyStatus: {
+                                          ...member.pregnancyStatus,
+                                          dueDate: date.toISOString()
+                                        }
+                                      })
+                                    }
+                                  }}
+                                  disabled={(date) =>
+                                    date < new Date() || date > new Date(new Date().setMonth(new Date().getMonth() + 9))
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        )}
+                      </div>
+                      {member.pregnancyStatus?.isPregnant && (
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-sm">Risk Level</Label>
+                            <Select 
+                              value={member.pregnancyStatus.isHighRisk ? 'high' : 'normal'} 
+                              onValueChange={(value) => {
+                                updateMember(member.id, {
+                                  pregnancyStatus: {
+                                    ...member.pregnancyStatus!,
+                                    isHighRisk: value === 'high'
+                                  }
+                                })
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="normal">Normal risk</SelectItem>
+                                <SelectItem value="high">High risk</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Multiples</Label>
+                            <RadioGroup 
+                              value={member.pregnancyStatus.multiples ? 'yes' : 'no'}
+                              onValueChange={(value) => {
+                                updateMember(member.id, {
+                                  pregnancyStatus: {
+                                    ...member.pregnancyStatus!,
+                                    multiples: value === 'yes'
+                                  }
+                                })
+                              }}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no" id={`multiples-no-${member.id}`} />
+                                <Label htmlFor={`multiples-no-${member.id}`} className="text-sm font-normal">Single</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="yes" id={`multiples-yes-${member.id}`} />
+                                <Label htmlFor={`multiples-yes-${member.id}`} className="text-sm font-normal">Twins or more</Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Planned Delivery Type</Label>
+                            <Select 
+                              value={member.pregnancyStatus.plannedDeliveryType || 'unknown'} 
+                              onValueChange={(value) => {
+                                updateMember(member.id, {
+                                  pregnancyStatus: {
+                                    ...member.pregnancyStatus!,
+                                    plannedDeliveryType: value as 'vaginal' | 'cesarean' | 'unknown'
+                                  }
+                                })
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unknown">Not determined</SelectItem>
+                                <SelectItem value="vaginal">Vaginal delivery</SelectItem>
+                                <SelectItem value="cesarean">Cesarean section</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label className="text-sm">Pre-existing Conditions</Label>
+                    <AIAutocomplete
+                      options={commonConditions.map(condition => ({
+                        value: condition.name,
+                        label: condition.name,
+                        category: condition.category,
+                        details: condition.icdCode ? `ICD: ${condition.icdCode}` : undefined
+                      }))}
+                      value={member.conditions}
+                      onChange={(conditions) => updateMember(member.id, { conditions })}
+                      placeholder="Search or select conditions..."
+                      searchPlaceholder="Search conditions (AI-powered)..."
+                      emptyText="No conditions found."
+                      searchType="conditions"
+                      allowCustom={true}
+                      customLabel="Add condition"
                     />
                   </div>
 
-                  <TagInput
-                    label="Pre-existing Conditions"
-                    tags={member.conditions}
-                    onTagsChange={(conditions) => updateMember(member.id, { conditions })}
-                    placeholder="e.g., Diabetes, Hypertension"
-                  />
-
-                  <TagInput
-                    label="Current Medications"
-                    tags={member.medications}
-                    onTagsChange={(medications) => updateMember(member.id, { medications })}
-                    placeholder="e.g., Metformin, Lisinopril"
-                  />
+                  <div className="space-y-2">
+                    <Label className="text-sm">Current Medications</Label>
+                    <AIAutocomplete
+                      options={Object.entries(commonMedications).flatMap(([category, meds]) =>
+                        meds.map(med => ({
+                          value: med.name,
+                          label: med.name,
+                          category: category.charAt(0).toUpperCase() + category.slice(1),
+                          details: `${med.genericName} (${med.drugClass})${med.isSpecialty ? ' - Specialty' : ''}`
+                        }))
+                      )}
+                      value={member.medications}
+                      onChange={(medications) => updateMember(member.id, { medications })}
+                      placeholder="Search or select medications..."
+                      searchPlaceholder="Search medications (AI-powered)..."
+                      emptyText="No medications found."
+                      searchType="medications"
+                      allowCustom={true}
+                      customLabel="Add medication"
+                    />
+                  </div>
+                  
+                  {/* Allergies Section */}
+                  <div className="space-y-2">
+                    <Label className="text-sm">Allergies</Label>
+                    <AIAutocomplete
+                      options={[
+                        // Common medication allergies
+                        { value: "Penicillin", label: "Penicillin", category: "Medications", details: "Common antibiotic allergy" },
+                        { value: "Amoxicillin", label: "Amoxicillin", category: "Medications", details: "Penicillin-type antibiotic" },
+                        { value: "Sulfa drugs", label: "Sulfa drugs", category: "Medications", details: "Sulfonamide antibiotics" },
+                        { value: "Aspirin", label: "Aspirin", category: "Medications", details: "NSAID allergy" },
+                        { value: "Ibuprofen", label: "Ibuprofen", category: "Medications", details: "NSAID allergy" },
+                        { value: "Codeine", label: "Codeine", category: "Medications", details: "Opioid allergy" },
+                        // Common food allergies
+                        { value: "Peanuts", label: "Peanuts", category: "Food", details: "Tree nut allergy" },
+                        { value: "Tree nuts", label: "Tree nuts", category: "Food", details: "Includes almonds, cashews, walnuts" },
+                        { value: "Milk", label: "Milk", category: "Food", details: "Dairy allergy" },
+                        { value: "Eggs", label: "Eggs", category: "Food", details: "Egg protein allergy" },
+                        { value: "Wheat", label: "Wheat", category: "Food", details: "Gluten allergy" },
+                        { value: "Soy", label: "Soy", category: "Food", details: "Soybean allergy" },
+                        { value: "Fish", label: "Fish", category: "Food", details: "Finned fish allergy" },
+                        { value: "Shellfish", label: "Shellfish", category: "Food", details: "Crustacean allergy" },
+                        // Environmental allergies
+                        { value: "Pollen", label: "Pollen", category: "Environmental", details: "Seasonal allergies" },
+                        { value: "Dust mites", label: "Dust mites", category: "Environmental", details: "Indoor allergen" },
+                        { value: "Pet dander", label: "Pet dander", category: "Environmental", details: "Cat/dog allergies" },
+                        { value: "Mold", label: "Mold", category: "Environmental", details: "Fungal allergies" },
+                        { value: "Latex", label: "Latex", category: "Environmental", details: "Natural rubber allergy" },
+                        { value: "Bee stings", label: "Bee stings", category: "Environmental", details: "Insect venom allergy" },
+                      ]}
+                      value={member.allergies}
+                      onChange={(allergies) => updateMember(member.id, { allergies })}
+                      placeholder="Search or select allergies..."
+                      searchPlaceholder="Search allergies (AI-powered)..."
+                      emptyText="No allergies found."
+                      searchType="allergies"
+                      allowCustom={true}
+                      customLabel="Add allergy"
+                    />
+                  </div>
                   
                   <OtherServicesInput 
                     services={member.otherServices || []} 
@@ -356,7 +794,12 @@ export default function HealthProfilePage() {
             ))}
           </div>
 
-          <Button onClick={addMember} variant="outline" className="w-full mb-6">
+          <Button 
+            onClick={handleAddMember} 
+            variant="outline" 
+            className="w-full mb-6 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            aria-label="Add new family member to health profile"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Add Family Member
           </Button>
@@ -367,6 +810,42 @@ export default function HealthProfilePage() {
               {members.length} member{members.length !== 1 ? "s" : ""} in profile
             </div>
           </div>
+          
+          {/* Healthcare Utilization Analysis */}
+          {primaryMemberUtilization && members[0].age && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Healthcare Utilization Analysis</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    {members[0].conditions.length > 0 ? "Live updating" : "Add conditions to see analysis"}
+                  </span>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowUtilization(!showUtilization)}
+                    disabled={members[0].conditions.length === 0}
+                  >
+                    {showUtilization ? "Hide" : "Show"} Analysis
+                  </Button>
+                </div>
+              </div>
+              {showUtilization && members[0].conditions.length > 0 && (
+                <UtilizationDisplay 
+                  utilization={primaryMemberUtilization}
+                  memberName={members[0].age ? `Primary Member (Age ${members[0].age})` : "Primary Member"}
+                />
+              )}
+              {showUtilization && members[0].conditions.length === 0 && (
+                <Card>
+                  <CardContent className="py-8 text-center">
+                    <p className="text-gray-500">
+                      Add pre-existing conditions to see healthcare utilization predictions and risk assessment.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </SidebarInset>

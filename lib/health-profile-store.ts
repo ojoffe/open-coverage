@@ -12,9 +12,25 @@ export interface OtherService {
   frequency: number
 }
 
+export interface PregnancyStatus {
+  isPregnant: boolean
+  dueDate?: string
+  isHighRisk: boolean
+  multiples: boolean
+  plannedDeliveryType: 'vaginal' | 'cesarean' | 'unknown'
+}
+
 export interface Member {
   id: string
   age: string
+  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say'
+  pregnancyStatus?: PregnancyStatus
+  height?: number // in inches
+  weight?: number // in pounds
+  bmi?: number // calculated
+  smokingStatus?: 'never' | 'former' | 'current' | 'unknown'
+  alcoholUse?: 'none' | 'moderate' | 'heavy' | 'unknown'
+  exerciseFrequency?: 'none' | 'occasional' | 'regular' | 'daily'
   conditions: string[]
   medications: string[]
   allergies: string[]
