@@ -152,7 +152,8 @@ function LoadingScreen({ progress }: LoadingScreenProps) {
       <div className="w-full max-w-xs overflow-hidden rounded-lg bg-white p-8 text-center shadow-lg">
         <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-blue-600" />
         <h2 className="mb-2 text-xl font-semibold text-gray-900">Analyzing Policies</h2>
-        <p className="mb-4 text-gray-600">Processing your SBC documents...</p>
+        {/* <p className="mb-4 text-gray-600">Processing your SBC documents...</p> */}
+        <p className="mb-4 text-sm text-gray-500">This typically takes around a minute</p>
 
         <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
           <div className="h-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />

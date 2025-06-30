@@ -20,6 +20,7 @@ import { retrievePricingForAnalysis, type PricingRetrievalResult, type ServicePr
 import { recalculateHealthUsage, type RecalculatedHealthUsage } from "@/app/actions/recalculate-health-usage"
 import { SmartAnalysisButton } from "@/components/smart-analysis-button"
 import { getCategoryColor } from "@/lib/medication-categories"
+import PolicyAnalysisComponent, { type PolicyAnalysisResult } from "@/components/policy-analysis"
 
 interface PolicyComparisonProps {
   results: ProcessSBCResponse
@@ -1045,6 +1046,54 @@ function AnalysisConfigForm({
                                     <h4 className="font-medium mb-3">
                                       {healthProfile[memberIndex]?.name || `Member ${memberIndex + 1}`}
                                     </h4>
+                                    
+                                    {/* Show medication tier costs if member has medications */}
+                                    {member.medications.count > 0 && member.medicationDetails && member.medicationDetails.length > 0 && (
+                                      <div className="mb-3 p-3 bg-purple-100 rounded-lg">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Pill className="w-4 h-4 text-purple-700" />
+                                          <span className="text-sm font-medium text-purple-900">Medication Coverage</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                          {(() => {
+                                            const genericService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('generic'))
+                                            const brandService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('brand') && !s.name.toLowerCase().includes('non-preferred'))
+                                            const nonPreferredService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('non-preferred'))
+                                            const specialtyService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('specialty'))
+                                            
+                                            return (
+                                              <>
+                                                {genericService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Generic:</span>
+                                                    <span className="font-medium text-purple-900">{genericService.what_you_will_pay.network_provider}</span>
+                                                  </div>
+                                                )}
+                                                {brandService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Preferred:</span>
+                                                    <span className="font-medium text-purple-900">{brandService.what_you_will_pay.network_provider}</span>
+                                                  </div>
+                                                )}
+                                                {nonPreferredService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Non-Pref:</span>
+                                                    <span className="font-medium text-purple-900">{nonPreferredService.what_you_will_pay.network_provider}</span>
+                                                  </div>
+                                                )}
+                                                {specialtyService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Specialty:</span>
+                                                    <span className="font-medium text-purple-900">{specialtyService.what_you_will_pay.network_provider}</span>
+                                                  </div>
+                                                )}
+                                              </>
+                                            )
+                                          })()}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
                                     <div className="space-y-2">
                                       {member.primaryCareVisits.count > 0 && (
                                         <div className="flex justify-between text-sm">
@@ -1289,97 +1338,6 @@ function PolicyComparisonTable({
               ))}
             </tr>
             
-            {/* Medication Coverage Section */}
-            <tr className="border-t-2 border-gray-300">
-              <td className="p-2 font-semibold text-gray-900 bg-purple-50" colSpan={policiesWithResults.length + 1}>
-                <div className="flex items-center gap-2">
-                  <Pill className="w-4 h-4" />
-                  <span>Medication Coverage</span>
-                </div>
-              </td>
-            </tr>
-            <tr className="border-t">
-              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Generic Drugs</td>
-              {policiesWithResults.map(({ policy }, index) => {
-                const genericService = policy.services_you_may_need.find(s => 
-                  s.name.toLowerCase().includes('generic')
-                )
-                return (
-                  <td key={index} className="p-4 text-sm">
-                    {genericService ? (
-                      <div>
-                        <div className="font-medium">{genericService.what_you_will_pay.network_provider}</div>
-                        <div className="text-xs text-gray-500">Tier 1</div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">Not specified</span>
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-            <tr className="border-t">
-              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Preferred Brand Drugs</td>
-              {policiesWithResults.map(({ policy }, index) => {
-                const brandService = policy.services_you_may_need.find(s => 
-                  s.name.toLowerCase().includes('preferred brand') || 
-                  (s.name.toLowerCase().includes('brand') && !s.name.toLowerCase().includes('non-preferred'))
-                )
-                return (
-                  <td key={index} className="p-4 text-sm">
-                    {brandService ? (
-                      <div>
-                        <div className="font-medium">{brandService.what_you_will_pay.network_provider}</div>
-                        <div className="text-xs text-gray-500">Tier 2</div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">Not specified</span>
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-            <tr className="border-t">
-              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Non-Preferred Brand Drugs</td>
-              {policiesWithResults.map(({ policy }, index) => {
-                const nonPreferredService = policy.services_you_may_need.find(s => 
-                  s.name.toLowerCase().includes('non-preferred')
-                )
-                return (
-                  <td key={index} className="p-4 text-sm">
-                    {nonPreferredService ? (
-                      <div>
-                        <div className="font-medium">{nonPreferredService.what_you_will_pay.network_provider}</div>
-                        <div className="text-xs text-gray-500">Tier 3</div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">Not specified</span>
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-            <tr className="border-t">
-              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Specialty Drugs</td>
-              {policiesWithResults.map(({ policy }, index) => {
-                const specialtyService = policy.services_you_may_need.find(s => 
-                  s.name.toLowerCase().includes('specialty')
-                )
-                return (
-                  <td key={index} className="p-4 text-sm">
-                    {specialtyService ? (
-                      <div>
-                        <div className="font-medium">{specialtyService.what_you_will_pay.network_provider}</div>
-                        <div className="text-xs text-gray-500">Tier 4</div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">Not specified</span>
-                    )}
-                  </td>
-                )
-              })}
-            </tr>
-            
             {/* Analysis Section */}
             {analysisResults && analysisResults.length > 0 && (
               <>
@@ -1442,6 +1400,30 @@ function PolicyComparisonTable({
                                   {memberIndex === 0 ? 'Primary Member' : `Member ${memberIndex + 1}`}
                                 </div>
                                 
+                                {/* Show medication tier costs if member has medications */}
+                                {member.medications.count > 0 && member.medicationDetails && member.medicationDetails.length > 0 && (
+                                  <div className="mb-2 p-2 bg-purple-50 rounded text-xs">
+                                    <div className="font-medium text-purple-900 mb-1">Medication Tier Costs:</div>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-purple-800">
+                                      {(() => {
+                                        const genericService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('generic'))
+                                        const brandService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('brand') && !s.name.toLowerCase().includes('non-preferred'))
+                                        const nonPreferredService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('non-preferred'))
+                                        const specialtyService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('specialty'))
+                                        
+                                        return (
+                                          <>
+                                            {genericService && <div>Generic: {genericService.what_you_will_pay.network_provider}</div>}
+                                            {brandService && <div>Brand: {brandService.what_you_will_pay.network_provider}</div>}
+                                            {nonPreferredService && <div>Non-Pref: {nonPreferredService.what_you_will_pay.network_provider}</div>}
+                                            {specialtyService && <div>Specialty: {specialtyService.what_you_will_pay.network_provider}</div>}
+                                          </>
+                                        )
+                                      })()}
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 <div className="space-y-1">
                                   {member.primaryCareVisits.count > 0 && (
                                     <div className="flex justify-between">
@@ -1458,9 +1440,27 @@ function PolicyComparisonTable({
                                   )}
                                   
                                   {member.medications.count > 0 && (
-                                    <div className="flex justify-between">
-                                      <span>Medications ({member.medications.count}× ${member.medications.costPerFill})</span>
-                                      <span className="font-medium">${member.medications.total.toLocaleString()}</span>
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between font-medium">
+                                        <span>Medications ({member.medications.count} fills)</span>
+                                        <span>${member.medications.total.toLocaleString()}</span>
+                                      </div>
+                                      {member.medicationDetails && member.medicationDetails.length > 0 && (
+                                        <div className="ml-2 space-y-1 text-xs">
+                                          {member.medicationDetails.map((med: any, medIndex: number) => (
+                                            <div key={medIndex} className="flex items-center justify-between">
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-gray-600">•</span>
+                                                <span>{med.name}</span>
+                                                <Badge className={`text-xs px-1 py-0 h-4 ${getCategoryColor(med.category)}`}>
+                                                  {med.categoryDisplay}
+                                                </Badge>
+                                              </div>
+                                              <span>${med.annualCost}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                   
@@ -2117,9 +2117,9 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
           <PolicyAnalysisComponent
             policies={successfulPolicies}
             healthProfile={members}
-            onAnalysisComplete={(results) => {
+            onAnalysisComplete={(results: PolicyAnalysisResult[]) => {
               // Convert PolicyAnalysisResult[] to PolicyAnalysis[] for compatibility
-              const convertedResults = results.map(result => ({
+              const convertedResults = results.map((result: PolicyAnalysisResult) => ({
                 policyName: result.policyName,
                 grade: result.grade,
                 score: result.grade === 'A' ? 90 : result.grade === 'B' ? 80 : result.grade === 'C' ? 70 : result.grade === 'D' ? 60 : 50,
@@ -2154,7 +2154,11 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
                   })),
                   memberTotal: member.memberTotal
                 })),
-                breakdown: result.breakdown
+                breakdown: {
+                  ...result.breakdown,
+                  premiums: 0, // Not included in our analysis
+                  outOfPocketMax: 0 // Will be calculated elsewhere
+                }
               }))
               setAnalysisResults(convertedResults)
             }}
