@@ -288,8 +288,8 @@ function calculatePolicyGrade(policy: SBCData, healthProfile: HealthProfile = DE
   totalAnnualCost += estimatedMonthlyPremium * 12
   
   // Deductible impact
-  const deductible = policy.important_questions.overall_deductible.individual
-  const familyDeductible = policy.important_questions.overall_deductible.family
+  const deductible = policy.important_questions.overall_deductible.in_network.individual
+  const familyDeductible = policy.important_questions.overall_deductible.in_network.family
   const relevantDeductible = healthProfile.familySize > 1 ? familyDeductible : deductible
   
   // Calculate expected medical costs
@@ -341,8 +341,8 @@ function calculatePolicyGrade(policy: SBCData, healthProfile: HealthProfile = DE
   
   // Cap at out-of-pocket maximum
   const outOfPocketMax = healthProfile.familySize > 1 
-    ? policy.important_questions.out_of_pocket_limit_for_plan.family
-    : policy.important_questions.out_of_pocket_limit_for_plan.individual
+    ? policy.important_questions.out_of_pocket_limit_for_plan.in_network.family
+    : policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual
   
   const medicalOutOfPocket = Math.min(deductiblePayment + afterDeductibleCosts, outOfPocketMax)
   totalAnnualCost = estimatedMonthlyPremium * 12 + medicalOutOfPocket
@@ -708,6 +708,25 @@ function AnalysisConfigForm({
         <CardContent className="space-y-6">
           {currentStep === 'config' && (
             <>
+              {/* Network Type Selection */}
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-sm mb-1">Network Type</h4>
+                    <p className="text-xs text-gray-600">Choose whether to analyze costs for in-network or out-of-network providers</p>
+                  </div>
+                  <Select value={networkType} onValueChange={(value: 'in-network' | 'out-of-network') => setNetworkType(value)}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in-network">In-Network</SelectItem>
+                      <SelectItem value="out-of-network">Out-of-Network</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Configuration inputs */}
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -1006,6 +1025,11 @@ function AnalysisConfigForm({
                     <p className="text-green-700 text-sm">
                       Your personalized cost analysis has been calculated based on your health profile and the pricing data we retrieved.
                     </p>
+                    <div className="mt-3">
+                      <Badge variant={networkType === 'in-network' ? 'default' : 'secondary'} className="text-sm">
+                        {networkType === 'in-network' ? '🏥 In-Network' : '🌐 Out-of-Network'} Provider Costs
+                      </Badge>
+                    </div>
                   </div>
 
                   <div className="grid gap-6">
@@ -1066,25 +1090,41 @@ function AnalysisConfigForm({
                                                 {genericService && (
                                                   <div className="flex justify-between">
                                                     <span className="text-purple-700">Generic:</span>
-                                                    <span className="font-medium text-purple-900">{genericService.what_you_will_pay.network_provider}</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? genericService.what_you_will_pay.network_provider 
+                                                        : genericService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
                                                   </div>
                                                 )}
                                                 {brandService && (
                                                   <div className="flex justify-between">
                                                     <span className="text-purple-700">Preferred:</span>
-                                                    <span className="font-medium text-purple-900">{brandService.what_you_will_pay.network_provider}</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? brandService.what_you_will_pay.network_provider 
+                                                        : brandService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
                                                   </div>
                                                 )}
                                                 {nonPreferredService && (
                                                   <div className="flex justify-between">
                                                     <span className="text-purple-700">Non-Pref:</span>
-                                                    <span className="font-medium text-purple-900">{nonPreferredService.what_you_will_pay.network_provider}</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? nonPreferredService.what_you_will_pay.network_provider 
+                                                        : nonPreferredService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
                                                   </div>
                                                 )}
                                                 {specialtyService && (
                                                   <div className="flex justify-between">
                                                     <span className="text-purple-700">Specialty:</span>
-                                                    <span className="font-medium text-purple-900">{specialtyService.what_you_will_pay.network_provider}</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? specialtyService.what_you_will_pay.network_provider 
+                                                        : specialtyService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
                                                   </div>
                                                 )}
                                               </>
@@ -1300,25 +1340,25 @@ function PolicyComparisonTable({
             <tr className="border-t">
               <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Individual Deductible</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.individual.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.in_network.individual.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
               <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Family Deductible</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.family.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.in_network.family.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
               <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Individual Out-of-Pocket Max</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.individual.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
               <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Family Out-of-Pocket Max</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.family.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.in_network.family.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
@@ -1344,7 +1384,12 @@ function PolicyComparisonTable({
                 <tr className="border-t-2 border-gray-300">
                   <td className="p-2 font-semibold text-gray-900 bg-blue-50 text-lg" colSpan={policiesWithResults.length + 1}>
                     <div>
-                      <div>Personalized Analysis</div>
+                      <div className="flex items-center gap-3">
+                        <span>Personalized Analysis</span>
+                        <Badge variant={networkType === 'in-network' ? 'default' : 'secondary'} className="text-xs font-normal">
+                          {networkType === 'in-network' ? 'In-Network' : 'Out-of-Network'}
+                        </Badge>
+                      </div>
                       <div className="text-sm font-normal text-gray-600 mt-1">
                         Out-of-pocket costs only • Premium costs not included
                       </div>
@@ -1413,10 +1458,10 @@ function PolicyComparisonTable({
                                         
                                         return (
                                           <>
-                                            {genericService && <div>Generic: {genericService.what_you_will_pay.network_provider}</div>}
-                                            {brandService && <div>Brand: {brandService.what_you_will_pay.network_provider}</div>}
-                                            {nonPreferredService && <div>Non-Pref: {nonPreferredService.what_you_will_pay.network_provider}</div>}
-                                            {specialtyService && <div>Specialty: {specialtyService.what_you_will_pay.network_provider}</div>}
+                                            {genericService && <div>Generic: {networkType === 'in-network' ? genericService.what_you_will_pay.network_provider : genericService.what_you_will_pay.out_of_network_provider}</div>}
+                                            {brandService && <div>Brand: {networkType === 'in-network' ? brandService.what_you_will_pay.network_provider : brandService.what_you_will_pay.out_of_network_provider}</div>}
+                                            {nonPreferredService && <div>Non-Pref: {networkType === 'in-network' ? nonPreferredService.what_you_will_pay.network_provider : nonPreferredService.what_you_will_pay.out_of_network_provider}</div>}
+                                            {specialtyService && <div>Specialty: {networkType === 'in-network' ? specialtyService.what_you_will_pay.network_provider : specialtyService.what_you_will_pay.out_of_network_provider}</div>}
                                           </>
                                         )
                                       })()}

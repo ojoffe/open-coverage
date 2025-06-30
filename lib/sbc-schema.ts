@@ -48,8 +48,14 @@ export const sbcSchema = z.object({
   }),
   important_questions: z.object({
     overall_deductible: z.object({
-      individual: z.number(),
-      family: z.number(),
+      in_network: z.object({
+        individual: z.number(),
+        family: z.number(),
+      }),
+      out_of_network: z.object({
+        individual: z.number(),
+        family: z.number(),
+      }),
       details: z.string().optional(),
     }),
     services_covered_before_deductible: z.object({
@@ -62,8 +68,14 @@ export const sbcSchema = z.object({
       details: z.string().optional(),
     }),
     out_of_pocket_limit_for_plan: z.object({
-      individual: z.number(),
-      family: z.number(),
+      in_network: z.object({
+        individual: z.number(),
+        family: z.number(),
+      }),
+      out_of_network: z.object({
+        individual: z.number(),
+        family: z.number(),
+      }),
       details: z.string().optional(),
     }),
     not_included_in_out_of_pocket_limit: z.object({

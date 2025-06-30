@@ -436,15 +436,15 @@ export async function runEnhancedPolicyAnalysis(
     
     // Apply insurance calculations
     const relevantDeductible = healthProfile.length > 1 
-      ? policy.important_questions.overall_deductible.family
-      : policy.important_questions.overall_deductible.individual
+      ? policy.important_questions.overall_deductible.in_network.family
+      : policy.important_questions.overall_deductible.in_network.individual
     
     const deductibleApplied = Math.min(totalMedicalCosts, relevantDeductible)
     const coinsuranceApplied = Math.max(0, totalMedicalCosts - relevantDeductible) * 0.2
     
     const outOfPocketMax = healthProfile.length > 1
-      ? policy.important_questions.out_of_pocket_limit_for_plan.family
-      : policy.important_questions.out_of_pocket_limit_for_plan.individual
+      ? policy.important_questions.out_of_pocket_limit_for_plan.in_network.family
+      : policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual
     
     const finalMedicalCosts = Math.min(deductibleApplied + coinsuranceApplied, outOfPocketMax)
     const totalAnnualCost = (estimatedMonthlyPremium * 12) + finalMedicalCosts
