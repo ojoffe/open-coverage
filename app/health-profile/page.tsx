@@ -89,31 +89,45 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [frequency, setFrequency] = useState(1)
   
+  // Check if "No services" is selected
+  const hasNoServices = services.some(s => s.name === "NONE_SERVICES")
+  
   // Convert AVAILABLE_SERVICES to options format
-  const serviceOptions = AVAILABLE_SERVICES
-    .filter(service => service !== "Other (specify)")
-    .map(service => {
-      const category = 
-        service.includes("Primary care") || service.includes("Preventive") ? "Primary & Preventive Care" :
-        service.includes("Diagnostic") || service.includes("Imaging") ? "Diagnostic & Imaging" :
-        service.includes("Generic") || service.includes("drugs") ? "Prescription Drugs" :
-        service.includes("Emergency") || service.includes("Urgent") ? "Emergency & Urgent Care" :
-        service.includes("surgery") || service.includes("surgeon") ? "Surgery & Hospital" :
-        service.includes("mental") || service.includes("behavioral") ? "Mental Health" :
-        service.includes("Delivery") || service.includes("maternity") ? "Maternity Care" :
-        service.includes("Rehabilitation") || service.includes("Habilitation") ? "Therapy" :
-        service.includes("Children") ? "Children's Services" :
-        "Other Services"
-      
-      return {
-        value: service,
-        label: service,
-        category: category
-      }
-    })
+  const serviceOptions = [
+    { value: "NONE_SERVICES", label: "No expected medical services", category: "None" },
+    ...AVAILABLE_SERVICES
+      .filter(service => service !== "Other (specify)")
+      .map(service => {
+        const category = 
+          service.includes("Primary care") || service.includes("Preventive") ? "Primary & Preventive Care" :
+          service.includes("Diagnostic") || service.includes("Imaging") ? "Diagnostic & Imaging" :
+          service.includes("Generic") || service.includes("drugs") ? "Prescription Drugs" :
+          service.includes("Emergency") || service.includes("Urgent") ? "Emergency & Urgent Care" :
+          service.includes("surgery") || service.includes("surgeon") ? "Surgery & Hospital" :
+          service.includes("mental") || service.includes("behavioral") ? "Mental Health" :
+          service.includes("Delivery") || service.includes("maternity") ? "Maternity Care" :
+          service.includes("Rehabilitation") || service.includes("Habilitation") ? "Therapy" :
+          service.includes("Children") ? "Children's Services" :
+          "Other Services"
+        
+        return {
+          value: service,
+          label: service,
+          category: category
+        }
+      })
+  ]
   
   const addServices = () => {
     if (selectedServices.length > 0 && frequency > 0) {
+      // If "NONE_SERVICES" is selected, clear all other services
+      if (selectedServices.includes("NONE_SERVICES")) {
+        onServicesChange([{ name: "NONE_SERVICES", frequency: 0 }])
+        setSelectedServices([])
+        setFrequency(1)
+        return
+      }
+      
       const newServices = selectedServices
         .filter(serviceName => !services.some(s => s.name === serviceName))
         .map(serviceName => ({
@@ -122,7 +136,9 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
         }))
       
       if (newServices.length > 0) {
-        onServicesChange([...services, ...newServices])
+        // Remove "NONE_SERVICES" if adding actual services
+        const filteredServices = services.filter(s => s.name !== "NONE_SERVICES")
+        onServicesChange([...filteredServices, ...newServices])
         setSelectedServices([])
         setFrequency(1)
       }
@@ -219,6 +235,10 @@ function OtherServicesInput({ services = [], onServicesChange }: OtherServicesIn
       {services.length === 0 && (
         <p className="text-sm text-gray-500 italic">No additional services added yet</p>
       )}
+      
+      {hasNoServices && (
+        <p className="text-xs text-green-600 mt-2">✓ No expected medical services confirmed</p>
+      )}
     </div>
   )
 }
@@ -245,36 +265,47 @@ export default function HealthProfilePage() {
   }, [members])
   
   // Calculate profile completeness for basic profile
-  const calculateBasicCompleteness = (member: any) => {
+  const calculateBasicCompleteness = (member: Member) => {
+    // Demographics scoring (age, gender, height, weight)
     const demographics = [
-      member.age ? 25 : 0,
+      member.age && member.age.trim() !== '' ? 25 : 0,
       member.gender && member.gender !== 'prefer_not_to_say' ? 25 : 0,
-      member.height ? 25 : 0,
-      member.weight ? 25 : 0,
+      member.height && member.height > 0 ? 25 : 0,
+      member.weight && member.weight > 0 ? 25 : 0,
     ].reduce((a, b) => a + b, 0)
     
-    const conditions = member.conditions.length > 0 ? 100 : 0
-    const medications = member.medications.length > 0 ? 100 : 0
-    const providers = 0 // Not implemented in basic profile
-    const history = 0 // Not implemented in basic profile
+    // Conditions scoring - 100% if at least one condition is added OR explicitly marked as "NONE"
+    const conditions = (member.conditions && member.conditions.length > 0) ? 100 : 0
+    
+    // Medications scoring - 100% if at least one medication is added OR explicitly marked as "NONE"
+    const medications = (member.medications && member.medications.length > 0) ? 100 : 0
+    
+    // Providers scoring - Not implemented in basic profile
+    const providers = 0
+    
+    // History scoring - 100% if allergies are specified (including "NONE")
+    const history = (member.allergies && member.allergies.length > 0) ? 100 : 0
+    
+    // Preferences scoring (lifestyle factors and medical services)
     const preferences = [
-      member.otherServices?.length > 0 ? 25 : 0,
+      (member.otherServices && member.otherServices.length > 0) ? 25 : 0,
       member.smokingStatus && member.smokingStatus !== 'unknown' ? 25 : 0,
       member.alcoholUse && member.alcoholUse !== 'unknown' ? 25 : 0,
-      member.exerciseFrequency ? 25 : 0,
+      member.exerciseFrequency && member.exerciseFrequency !== 'occasional' ? 25 : 0,
     ].reduce((a, b) => a + b, 0)
     
+    // Calculate overall score (average of all categories)
     const overall = (demographics + conditions + medications + providers + history + preferences) / 6
     
     return {
-      overall: isNaN(overall) ? 0 : overall,
+      overall: Math.round(overall),
       categories: {
-        demographics: isNaN(demographics) ? 0 : demographics,
-        conditions: isNaN(conditions) ? 0 : conditions,
-        medications: isNaN(medications) ? 0 : medications,
-        providers: isNaN(providers) ? 0 : providers,
-        history: isNaN(history) ? 0 : history,
-        preferences: isNaN(preferences) ? 0 : preferences,
+        demographics: Math.round(demographics),
+        conditions: Math.round(conditions),
+        medications: Math.round(medications),
+        providers: Math.round(providers),
+        history: Math.round(history),
+        preferences: Math.round(preferences),
       }
     }
   }
@@ -325,7 +356,8 @@ export default function HealthProfilePage() {
           {members.length > 0 && members[0] && (
             <div className="mb-6">
               <ProfileCompleteness 
-                {...calculateBasicCompleteness(members[0])}
+                overallScore={calculateBasicCompleteness(members[0]).overall}
+                categories={calculateBasicCompleteness(members[0]).categories}
                 memberName={members[0].age ? `Primary Member (Age ${members[0].age})` : "Primary Member"}
               />
             </div>
@@ -706,43 +738,69 @@ export default function HealthProfilePage() {
                   <div className="space-y-2">
                     <Label className="text-sm">Pre-existing Conditions</Label>
                     <AIAutocomplete
-                      options={commonConditions.map(condition => ({
-                        value: condition.name,
-                        label: condition.name,
-                        category: condition.category,
-                        details: condition.icdCode ? `ICD: ${condition.icdCode}` : undefined
-                      }))}
+                      options={[
+                        { value: "NONE", label: "No pre-existing conditions", category: "None", details: "I have no medical conditions" },
+                        ...commonConditions.map(condition => ({
+                          value: condition.name,
+                          label: condition.name,
+                          category: condition.category,
+                          details: condition.icdCode ? `ICD: ${condition.icdCode}` : undefined
+                        }))
+                      ]}
                       value={member.conditions}
-                      onChange={(conditions) => updateMember(member.id, { conditions })}
-                      placeholder="Search or select conditions..."
+                      onChange={(conditions) => {
+                        // If "NONE" is selected, clear all other conditions
+                        if (conditions.includes("NONE")) {
+                          updateMember(member.id, { conditions: ["NONE"] })
+                        } else {
+                          updateMember(member.id, { conditions })
+                        }
+                      }}
+                      placeholder="Search conditions or select 'None'..."
                       searchPlaceholder="Search conditions (AI-powered)..."
                       emptyText="No conditions found."
                       searchType="conditions"
                       allowCustom={true}
                       customLabel="Add condition"
                     />
+                    {member.conditions.includes("NONE") && (
+                      <p className="text-xs text-green-600">✓ No pre-existing conditions confirmed</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Label className="text-sm">Current Medications</Label>
                     <AIAutocomplete
-                      options={Object.entries(commonMedications).flatMap(([category, meds]) =>
-                        meds.map(med => ({
-                          value: med.name,
-                          label: med.name,
-                          category: category.charAt(0).toUpperCase() + category.slice(1),
-                          details: `${med.genericName} (${med.drugClass})${med.isSpecialty ? ' - Specialty' : ''}`
-                        }))
-                      )}
+                      options={[
+                        { value: "NONE", label: "No current medications", category: "None", details: "I don't take any medications" },
+                        ...Object.entries(commonMedications).flatMap(([category, meds]) =>
+                          meds.map(med => ({
+                            value: med.name,
+                            label: med.name,
+                            category: category.charAt(0).toUpperCase() + category.slice(1),
+                            details: `${med.genericName} (${med.drugClass})${med.isSpecialty ? ' - Specialty' : ''}`
+                          }))
+                        )
+                      ]}
                       value={member.medications}
-                      onChange={(medications) => updateMember(member.id, { medications })}
-                      placeholder="Search or select medications..."
+                      onChange={(medications) => {
+                        // If "NONE" is selected, clear all other medications
+                        if (medications.includes("NONE")) {
+                          updateMember(member.id, { medications: ["NONE"] })
+                        } else {
+                          updateMember(member.id, { medications })
+                        }
+                      }}
+                      placeholder="Search medications or select 'None'..."
                       searchPlaceholder="Search medications (AI-powered)..."
                       emptyText="No medications found."
                       searchType="medications"
                       allowCustom={true}
                       customLabel="Add medication"
                     />
+                    {member.medications.includes("NONE") && (
+                      <p className="text-xs text-green-600">✓ No current medications confirmed</p>
+                    )}
                   </div>
                   
                   {/* Allergies Section */}
@@ -750,6 +808,7 @@ export default function HealthProfilePage() {
                     <Label className="text-sm">Allergies</Label>
                     <AIAutocomplete
                       options={[
+                        { value: "NONE", label: "No known allergies", category: "None", details: "I have no allergies" },
                         // Common medication allergies
                         { value: "Penicillin", label: "Penicillin", category: "Medications", details: "Common antibiotic allergy" },
                         { value: "Amoxicillin", label: "Amoxicillin", category: "Medications", details: "Penicillin-type antibiotic" },
@@ -775,14 +834,24 @@ export default function HealthProfilePage() {
                         { value: "Bee stings", label: "Bee stings", category: "Environmental", details: "Insect venom allergy" },
                       ]}
                       value={member.allergies}
-                      onChange={(allergies) => updateMember(member.id, { allergies })}
-                      placeholder="Search or select allergies..."
+                      onChange={(allergies) => {
+                        // If "NONE" is selected, clear all other allergies
+                        if (allergies.includes("NONE")) {
+                          updateMember(member.id, { allergies: ["NONE"] })
+                        } else {
+                          updateMember(member.id, { allergies })
+                        }
+                      }}
+                      placeholder="Search allergies or select 'None'..."
                       searchPlaceholder="Search allergies (AI-powered)..."
                       emptyText="No allergies found."
                       searchType="allergies"
                       allowCustom={true}
                       customLabel="Add allergy"
                     />
+                    {member.allergies.includes("NONE") && (
+                      <p className="text-xs text-green-600">✓ No known allergies confirmed</p>
+                    )}
                   </div>
                   
                   <OtherServicesInput 

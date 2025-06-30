@@ -251,7 +251,7 @@ export function calculateHealthcareUtilization(member: Member): HealthcareUtiliz
   // Condition-based utilization
   const conditionVisits: Record<string, number> = {}
   
-  member.conditions.forEach(conditionName => {
+  member.conditions.filter(c => c !== "NONE").forEach(conditionName => {
     const pattern = conditionUtilizationPatterns[conditionName]
     if (pattern) {
       primaryConditions.push(conditionName)
@@ -289,19 +289,19 @@ export function calculateHealthcareUtilization(member: Member): HealthcareUtiliz
   })
   
   // Add condition-based predictions
+  const actualConditions = member.conditions.filter(c => c !== "NONE")
   Object.entries(conditionVisits).forEach(([service, visits]) => {
     predictions.push({
       serviceType: service,
       annualVisits: visits,
       severity: visits > 10 ? "high" : visits > 5 ? "medium" : "low",
-      reason: `Management of ${member.conditions.join(", ")}`,
-      basedOn: "condition",
-      seasonalAdjustment: visits > 0 ? getSeasonalMultiplier(member.conditions[0], service) : undefined
+      reason: `Management of ${actualConditions.join(", ")}`,
+      basedOn: "condition"
     })
   })
   
   // Medication management visits
-  if (member.medications.length > 0) {
+  if (member.medications.length > 0 && !member.medications.includes("NONE")) {
     const medManagementVisits = Math.ceil(member.medications.length / 2) * 2
     predictions.push({
       serviceType: serviceTypeMapping.primaryCare,

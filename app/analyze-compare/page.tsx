@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, Suspense } from "react"
 import { FileText, Plus, Loader2, CheckCircle } from "lucide-react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
@@ -175,6 +175,7 @@ function AnalyzeCompareContent() {
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null)
   
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { saveAnalysis, getAnalysis, loadAnalysisFromKV } = useAnalysisStore()
 
   const MAX_POLICIES = 8
@@ -296,7 +297,7 @@ function AnalyzeCompareContent() {
       setProgress(100)
 
       // Show results after a brief delay
-      setTimeout(() => {
+      setTimeout(async () => {
         setIsAnalyzing(false)
         setProgress(0)
         setAnalysisResults(results)
@@ -304,9 +305,11 @@ function AnalyzeCompareContent() {
         // Save analysis automatically if there are successful results
         if (results.successCount > 0) {
           const analysisName = generateAnalysisName(results)
-          saveAnalysis(analysisName, results).then((analysisId) => {
-            setCurrentAnalysisId(analysisId)
-          })
+          const analysisId = await saveAnalysis(analysisName, results)
+          setCurrentAnalysisId(analysisId)
+          
+          // Redirect to the enhanced analysis page
+          router.push(`/analysis/${analysisId}`)
         }
       }, 1000)
     } catch (error) {

@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 
-import { FileText, Github, Home, Info, MoreHorizontal, Trash2, Eye, HeartCrack, Wrench, History, Stethoscope } from "lucide-react"
+import { FileText, Github, Home, Info, MoreHorizontal, Trash2, Eye, HeartCrack, Wrench, History, Stethoscope, DollarSign, Heart } from "lucide-react"
 
 import {
   Sidebar,
@@ -46,8 +46,26 @@ const data = {
       items: [
         {
           title: "Analyze & Compare Policies",
-          url: "/analyze-compare",
+          url: "/analyze-compare-v2",
           icon: Wrench,
+          isActive: false,
+        },
+        {
+          title: "Health Profile",
+          url: "/health-profile",
+          icon: Heart,
+          isActive: false,
+        },
+        {
+          title: "Cost Analysis",
+          url: "/cost-analysis",
+          icon: DollarSign,
+          isActive: false,
+        },
+        {
+          title: "Compare Policies",
+          url: "/compare-policies",
+          icon: FileText,
           isActive: false,
         },
         {

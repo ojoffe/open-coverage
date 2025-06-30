@@ -8,6 +8,7 @@ export interface SavedAnalysis {
   createdAt: Date
   results: ProcessSBCResponse
   policyNames: string[]
+  premiums?: Record<string, any>
 }
 
 export interface AnalysisMetadata {
@@ -61,7 +62,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
             name,
             createdAt: new Date(),
             results,
-            policyNames
+            policyNames,
+            premiums: (results as any).premiums
           }
           
           set(state => ({
@@ -85,7 +87,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
             name,
             createdAt: new Date(),
             results,
-            policyNames
+            policyNames,
+            premiums: (results as any).premiums
           }
           
           set(state => ({
@@ -125,7 +128,8 @@ export const useAnalysisStore = create<AnalysisStore>()(
           const data = await response.json()
           const analysis: SavedAnalysis = {
             ...data,
-            createdAt: new Date(data.createdAt)
+            createdAt: new Date(data.createdAt),
+            premiums: data.premiums
           }
           
           // Add to local cache
