@@ -250,20 +250,30 @@ export function calculateExpectedUtilization(member: EnhancedMember): ExpectedVi
 }
 
 // Generate health profile summary for AI context
-export function generateHealthProfileSummary(members: EnhancedMember[]): string {
+export function generateHealthProfileSummary(members: EnhancedMember[] | any[]): string {
   if (members.length === 0) return "No health profile configured."
   
   const summary = [`Family of ${members.length}:`]
   
   members.forEach((member, idx) => {
-    const conditions = member.conditions.map(c => 
-      `${c.name}${c.severity ? ` (${c.severity})` : ''}`
-    ).join(", ")
+    // Handle both EnhancedMember and simple Member types
+    let conditions: string
+    let medications: string
     
-    const medications = member.medications.map(m => m.name).join(", ")
+    if (typeof member.conditions?.[0] === 'string') {
+      // Simple Member type
+      conditions = member.conditions.filter((c: string) => c !== 'NONE').join(", ")
+      medications = member.medications?.filter((m: string) => m !== 'NONE').join(", ") || ''
+    } else {
+      // EnhancedMember type
+      conditions = member.conditions?.map((c: any) => 
+        `${c.name}${c.severity ? ` (${c.severity})` : ''}`
+      ).join(", ") || ''
+      medications = member.medications?.map((m: any) => m.name).join(", ") || ''
+    }
     
     summary.push(
-      `- Member ${idx + 1}: ${member.age}yo ${member.gender}, ` +
+      `- Member ${idx + 1}: ${member.age}yo ${member.gender || 'gender not specified'}, ` +
       `${conditions || 'no conditions'}, ` +
       `${medications ? `taking ${medications}` : 'no medications'}`
     )

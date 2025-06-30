@@ -247,22 +247,35 @@ export default function HealthProfilePage() {
   const { members, addMember, removeMember, updateMember, clearProfile } = useHealthProfileStore()
   const [pregnancyDueDates, setPregnancyDueDates] = useState<Record<string, Date | undefined>>({})
   const [showUtilization, setShowUtilization] = useState(false)
+  const [selectedMemberId, setSelectedMemberId] = useState<string>("")
   const { announce, announcementRef } = useScreenReaderAnnouncement()
   
-  // Memoize healthcare utilization calculation for primary member
-  const primaryMemberUtilization = useMemo(() => {
-    if (members.length > 0 && members[0].age) {
-      return calculateHealthcareUtilization(members[0])
-    }
-    return null
+  // Calculate utilization for all members
+  const memberUtilizations = useMemo(() => {
+    return members.map(member => ({
+      memberId: member.id,
+      memberName: member.age ? `Member (Age ${member.age})` : "Member",
+      utilization: member.age ? calculateHealthcareUtilization(member) : null,
+      hasConditions: member.conditions && member.conditions.length > 0 && !member.conditions.includes("NONE"),
+      hasBasicData: Boolean(member.age && member.age.trim() !== '')
+    }))
   }, [members])
   
-  // Auto-show utilization if member has sufficient data
+  // Set default selected member when members change
   React.useEffect(() => {
-    if (members.length > 0 && members[0] && members[0].age && members[0].conditions && members[0].conditions.length > 0) {
+    if (!selectedMemberId || !members.find(m => m.id === selectedMemberId)) {
+      const firstMemberWithData = members.find(m => m.age && m.age.trim() !== '')
+      setSelectedMemberId(firstMemberWithData?.id || members[0]?.id || "")
+    }
+  }, [members, selectedMemberId])
+  
+  // Auto-show utilization if any member has sufficient data
+  React.useEffect(() => {
+    const hasMemberWithData = memberUtilizations.some(mu => mu.utilization && mu.hasBasicData)
+    if (hasMemberWithData) {
       setShowUtilization(true)
     }
-  }, [members])
+  }, [memberUtilizations])
   
   // Calculate profile completeness for basic profile
   const calculateBasicCompleteness = (member: Member) => {
@@ -351,17 +364,6 @@ export default function HealthProfilePage() {
               Clear All
             </Button>
           </div>
-
-          {/* Profile Completeness Summary */}
-          {members.length > 0 && members[0] && (
-            <div className="mb-6">
-              <ProfileCompleteness 
-                overallScore={calculateBasicCompleteness(members[0]).overall}
-                categories={calculateBasicCompleteness(members[0]).categories}
-                memberName={members[0].age ? `Primary Member (Age ${members[0].age})` : "Primary Member"}
-              />
-            </div>
-          )}
           
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-6">
             {members.map((member, index) => (
@@ -873,45 +875,144 @@ export default function HealthProfilePage() {
             Add Family Member
           </Button>
 
+           {/* Profile Completeness Summary */}
+          {members.length > 0 && members[0] && (
+            <div className="mb-6">
+              <ProfileCompleteness 
+                overallScore={calculateBasicCompleteness(members[0]).overall}
+                categories={calculateBasicCompleteness(members[0]).categories}
+                memberName={members[0].age ? `Primary Member (Age ${members[0].age})` : "Primary Member"}
+              />
+            </div>
+          )}
+
           <div className="flex justify-between items-center pt-4">
             <p className="text-sm text-gray-500">Your health profile is automatically saved to your browser</p>
             <div className="text-sm text-gray-500">
               {members.length} member{members.length !== 1 ? "s" : ""} in profile
             </div>
           </div>
+
+          
           
           {/* Healthcare Utilization Analysis */}
-          {primaryMemberUtilization && members[0].age && (
+          {memberUtilizations.some(mu => mu.utilization) && (
             <div className="mt-8">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold">Healthcare Utilization Analysis</h2>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">
-                    {members[0].conditions.length > 0 ? "Live updating" : "Add conditions to see analysis"}
+                    {memberUtilizations.some(mu => mu.hasBasicData) ? "Live updating" : "Add age to see analysis"}
                   </span>
                   <Button 
                     variant="outline" 
                     onClick={() => setShowUtilization(!showUtilization)}
-                    disabled={members[0].conditions.length === 0}
+                    disabled={!memberUtilizations.some(mu => mu.hasBasicData)}
                   >
                     {showUtilization ? "Hide" : "Show"} Analysis
                   </Button>
                 </div>
               </div>
-              {showUtilization && members[0].conditions.length > 0 && (
-                <UtilizationDisplay 
-                  utilization={primaryMemberUtilization}
-                  memberName={members[0].age ? `Primary Member (Age ${members[0].age})` : "Primary Member"}
-                />
-              )}
-              {showUtilization && members[0].conditions.length === 0 && (
-                <Card>
-                  <CardContent className="py-8 text-center">
-                    <p className="text-gray-500">
-                      Add pre-existing conditions to see healthcare utilization predictions and risk assessment.
-                    </p>
-                  </CardContent>
-                </Card>
+              
+              {showUtilization && (
+                <>
+                  {/* Member Selector */}
+                  {members.length > 1 && (
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium mb-2 block">Select Member for Analysis</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {memberUtilizations.map((mu, index) => {
+                          const member = members.find(m => m.id === mu.memberId)
+                          if (!member || !member.age) return null
+                          
+                          const riskLevel = mu.utilization?.riskProfile?.overallRisk || "low"
+                          const riskColor = riskLevel === "high" ? "border-red-500 bg-red-50" :
+                                          riskLevel === "medium" ? "border-yellow-500 bg-yellow-50" :
+                                          "border-green-500 bg-green-50"
+                          const riskTextColor = riskLevel === "high" ? "text-red-700" :
+                                              riskLevel === "medium" ? "text-yellow-700" :
+                                              "text-green-700"
+                          
+                          return (
+                            <button
+                              key={mu.memberId}
+                              onClick={() => setSelectedMemberId(mu.memberId)}
+                              className={cn(
+                                "p-4 rounded-lg border-2 transition-all text-left",
+                                selectedMemberId === mu.memberId
+                                  ? `${riskColor} ${riskTextColor} border-opacity-100`
+                                  : "border-gray-200 hover:border-gray-300 bg-white"
+                              )}
+                              disabled={!mu.hasBasicData}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <span className="font-medium">
+                                  {index === 0 ? "Primary Member" : `Member ${index + 1}`}
+                                </span>
+                                {mu.hasConditions && mu.utilization && (
+                                  <Badge 
+                                    variant={riskLevel === "high" ? "destructive" : 
+                                            riskLevel === "medium" ? "secondary" : 
+                                            "default"}
+                                    className="text-xs"
+                                  >
+                                    {riskLevel} risk
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Age {member.age}
+                                {member.gender && member.gender !== 'prefer_not_to_say' && 
+                                  ` • ${member.gender.charAt(0).toUpperCase() + member.gender.slice(1)}`}
+                              </div>
+                              {mu.hasBasicData ? (
+                                <div className="text-xs mt-1">
+                                  {mu.hasConditions ? 
+                                    `${member.conditions.filter(c => c !== "NONE").length} condition(s)` :
+                                    "Baseline analysis"}
+                                </div>
+                              ) : (
+                                <div className="text-xs mt-1 text-gray-400">
+                                  Age required for analysis
+                                </div>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Utilization Display */}
+                  {(() => {
+                    const selectedUtilization = memberUtilizations.find(mu => mu.memberId === selectedMemberId)
+                    const selectedMember = members.find(m => m.id === selectedMemberId)
+                    const memberIndex = members.findIndex(m => m.id === selectedMemberId)
+                    
+                    if (selectedUtilization?.utilization) {
+                      return (
+                        <UtilizationDisplay 
+                          utilization={selectedUtilization.utilization}
+                          memberName={memberIndex === 0 ? 
+                            `Primary Member (Age ${selectedMember?.age})` : 
+                            `Member ${memberIndex + 1} (Age ${selectedMember?.age})`}
+                        />
+                      )
+                    } else {
+                      return (
+                        <Card>
+                          <CardContent className="py-8 text-center">
+                            <p className="text-gray-500">
+                              {selectedMember?.age ? 
+                                "Analysis will be available once healthcare utilization can be calculated. Try adding more demographic information." :
+                                "Add age to see baseline healthcare utilization predictions and analysis."}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )
+                    }
+                  })()}
+                </>
               )}
             </div>
           )}

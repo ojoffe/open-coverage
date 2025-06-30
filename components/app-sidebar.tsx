@@ -45,35 +45,35 @@ const data = {
       title: "Tools",
       items: [
         {
-          title: "Analyze & Compare Policies",
-          url: "/analyze-compare-v2",
-          icon: Wrench,
-          isActive: false,
-        },
-        {
           title: "Health Profile",
           url: "/health-profile",
           icon: Heart,
           isActive: false,
         },
         {
-          title: "Cost Analysis",
-          url: "/cost-analysis",
-          icon: DollarSign,
+          title: "Analyze & Compare Policies",
+          url: "/analyze-compare",
+          icon: Wrench,
           isActive: false,
         },
-        {
-          title: "Compare Policies",
-          url: "/compare-policies",
-          icon: FileText,
-          isActive: false,
-        },
-        {
-          title: "Find Optimal Providers",
-          url: "/find-providers",
-          icon: Stethoscope,
-          isActive: false,
-        },
+        // {
+        //   title: "Cost Analysis",
+        //   url: "/cost-analysis",
+        //   icon: DollarSign,
+        //   isActive: false,
+        // },
+        // {
+        //   title: "Compare Policies",
+        //   url: "/compare-policies",
+        //   icon: FileText,
+        //   isActive: false,
+        // },
+        // {
+        //   title: "Find Optimal Providers",
+        //   url: "/find-providers",
+        //   icon: Stethoscope,
+        //   isActive: false,
+        // },
       ] as NavigationItem[],
     },
     {
@@ -93,7 +93,7 @@ const data = {
         },
         {
           title: "GitHub Repository",
-          url: "https://github.com/opencoverage/open-coverage",
+          url: "https://github.com/aaln/open-coverage",
           icon: Github,
           external: true,
         },
@@ -105,13 +105,8 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [sbcModalOpen, setSbcModalOpen] = useState(false)
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
-  const { savedAnalyses, deleteAnalysis, analysisHistory, loadAnalysisHistory, clearAllHistory } = useAnalysisStore()
+  const { savedAnalyses, deleteAnalysis, clearAllHistory } = useAnalysisStore()
   const router = useRouter()
-
-  // Load analysis history on component mount
-  useEffect(() => {
-    loadAnalysisHistory()
-  }, [])
 
   const handleItemClick = (item: NavigationItem) => {
     if (item.action === "openSbcModal") {
@@ -139,23 +134,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
   }
 
-  // Combine saved analyses and analysis history, removing duplicates by ID
-  const allAnalyses = [
-    ...savedAnalyses.map(analysis => ({
-      id: analysis.id,
-      name: analysis.name,
-      policyCount: analysis.policyNames.length,
-      createdAt: analysis.createdAt,
-    })),
-    ...analysisHistory.filter(history => 
-      !savedAnalyses.find(saved => saved.id === history.id)
-    ).map(history => ({
-      id: history.id,
-      name: history.name,
-      policyCount: history.policyCount,
-      createdAt: history.createdAt,
-    }))
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  // Use saved analyses directly (all stored in localStorage now)
+  const allAnalyses = savedAnalyses.map(analysis => ({
+    id: analysis.id,
+    name: analysis.name,
+    policyCount: analysis.policyNames.length,
+    createdAt: analysis.createdAt,
+  })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
   return (
     <>

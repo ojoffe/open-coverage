@@ -1,7 +1,6 @@
 import { generateObject } from "ai";
 import { groq } from "@ai-sdk/groq";
 import { z } from "zod";
-import { useHealthProfileStore } from "@/lib/health-profile-store";
 import { generateHealthProfileSummary } from "@/lib/health-profile-utils";
 
 export const runtime = "edge";

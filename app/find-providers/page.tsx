@@ -444,7 +444,7 @@ export default function FindProvidersPage() {
                 <div className="space-y-4">
                   {providers.map((provider) => (
                     <Card key={provider.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
+                      <CardContent className="p-2">
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-2">

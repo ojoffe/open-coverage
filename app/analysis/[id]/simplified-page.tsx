@@ -52,7 +52,7 @@ export default function SimplifiedAnalysisPage() {
   const [recommendation, setRecommendation] = useState<any>(null)
   const [showDetails, setShowDetails] = useState(false)
   
-  const { getAnalysis, loadAnalysisFromKV } = useAnalysisStore()
+  const { getAnalysis } = useAnalysisStore()
   const { members } = useHealthProfileStore()
   
   // Check health profile completion
@@ -71,7 +71,7 @@ export default function SimplifiedAnalysisPage() {
   
   // Load analysis data
   useEffect(() => {
-    const loadAnalysis = async () => {
+    const loadAnalysis = () => {
       if (!analysisId) {
         setError("No analysis ID provided")
         setIsLoading(false)
@@ -79,20 +79,11 @@ export default function SimplifiedAnalysisPage() {
       }
 
       try {
-        // First check local storage
+        // Load from localStorage via the store
         const savedAnalysis = getAnalysis(analysisId)
         if (savedAnalysis) {
           setAnalysisResults(savedAnalysis.results)
           setAnalysisName(savedAnalysis.name)
-          setIsLoading(false)
-          return
-        }
-
-        // If not found locally, try loading from KV
-        const analysis = await loadAnalysisFromKV(analysisId)
-        if (analysis) {
-          setAnalysisResults(analysis.results)
-          setAnalysisName(analysis.name)
         } else {
           setError("Analysis not found")
         }
@@ -105,7 +96,7 @@ export default function SimplifiedAnalysisPage() {
     }
 
     loadAnalysis()
-  }, [analysisId, getAnalysis, loadAnalysisFromKV])
+  }, [analysisId, getAnalysis])
   
   // Calculate personalized costs when data is available
   useEffect(() => {
@@ -260,7 +251,7 @@ export default function SimplifiedAnalysisPage() {
                     <p className="text-green-100">Based on your health profile and expected medical needs</p>
                   </div>
                   
-                  <CardContent className="p-6">
+                  <CardContent className="p-2">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <h2 className="text-3xl font-bold mb-2">{recommendedSBC?.planName}</h2>

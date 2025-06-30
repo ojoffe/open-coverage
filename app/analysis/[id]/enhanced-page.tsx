@@ -54,7 +54,7 @@ export default function EnhancedAnalysisPage() {
   const [policyAnalyses, setPolicyAnalyses] = useState<any[]>([])
   const [recommendation, setRecommendation] = useState<any>(null)
   
-  const { getAnalysis, loadAnalysisFromKV } = useAnalysisStore()
+  const { getAnalysis } = useAnalysisStore()
   const { members } = useHealthProfileStore()
   
   // Check health profile completion
@@ -73,7 +73,7 @@ export default function EnhancedAnalysisPage() {
   
   // Load analysis data
   useEffect(() => {
-    const loadAnalysis = async () => {
+    const loadAnalysis = () => {
       if (!analysisId) {
         setError("No analysis ID provided")
         setIsLoading(false)
@@ -81,20 +81,12 @@ export default function EnhancedAnalysisPage() {
       }
 
       try {
-        // First check local storage
+        // Load from localStorage via the store
         const savedAnalysis = getAnalysis(analysisId)
         if (savedAnalysis) {
           setAnalysisResults(savedAnalysis.results)
           setAnalysisName(savedAnalysis.name)
           setIsLoading(false)
-          return
-        }
-
-        // If not found locally, try loading from KV
-        const analysis = await loadAnalysisFromKV(analysisId)
-        if (analysis) {
-          setAnalysisResults(analysis.results)
-          setAnalysisName(analysis.name)
         } else {
           setError("Analysis not found")
         }
@@ -107,7 +99,7 @@ export default function EnhancedAnalysisPage() {
     }
 
     loadAnalysis()
-  }, [analysisId, getAnalysis, loadAnalysisFromKV])
+  }, [analysisId, getAnalysis])
   
   // Calculate personalized costs when data is available
   useEffect(() => {

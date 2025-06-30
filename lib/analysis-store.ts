@@ -21,145 +21,54 @@ export interface AnalysisMetadata {
 
 interface AnalysisStore {
   savedAnalyses: SavedAnalysis[]
-  analysisHistory: AnalysisMetadata[]
-  saveAnalysis: (name: string, results: ProcessSBCResponse) => Promise<string>
-  deleteAnalysis: (id: string) => Promise<void>
+  saveAnalysis: (name: string, results: ProcessSBCResponse) => string
+  deleteAnalysis: (id: string) => void
   getAnalysis: (id: string) => SavedAnalysis | undefined
-  loadAnalysisFromKV: (id: string) => Promise<SavedAnalysis | null>
   updateAnalysisName: (id: string, name: string) => void
-  loadAnalysisHistory: () => Promise<void>
-  clearAllHistory: () => Promise<void>
+  clearAllHistory: () => void
 }
 
 export const useAnalysisStore = create<AnalysisStore>()(
   persist(
     (set, get) => ({
       savedAnalyses: [],
-      analysisHistory: [],
       
-      saveAnalysis: async (name: string, results: ProcessSBCResponse) => {
-        try {
-          // Save to KV via API
-          const response = await fetch('/api/analyses', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, results })
-          })
-          
-          if (!response.ok) {
-            throw new Error('Failed to save analysis')
-          }
-          
-          const { id } = await response.json()
-          
-          // Also save locally for quick access
-          const policyNames = results.results
-            .filter(r => r.success && r.data)
-            .map(r => r.data!.plan_summary.plan_name || r.fileName)
-          
-          const analysis: SavedAnalysis = {
-            id,
-            name,
-            createdAt: new Date(),
-            results,
-            policyNames,
-            premiums: (results as any).premiums
-          }
-          
-          set(state => ({
-            savedAnalyses: [analysis, ...state.savedAnalyses]
-          }))
-          
-          // Update history
-          await get().loadAnalysisHistory()
-          
-          return id
-        } catch (error) {
-          console.error('Failed to save analysis:', error)
-          // Fallback to local-only storage
-          const id = `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          const policyNames = results.results
-            .filter(r => r.success && r.data)
-            .map(r => r.data!.plan_summary.plan_name || r.fileName)
-          
-          const analysis: SavedAnalysis = {
-            id,
-            name,
-            createdAt: new Date(),
-            results,
-            policyNames,
-            premiums: (results as any).premiums
-          }
-          
-          set(state => ({
-            savedAnalyses: [analysis, ...state.savedAnalyses]
-          }))
-          
-          return id
-        }
-      },
-      
-      deleteAnalysis: async (id: string) => {
-        try {
-          // Delete from KV via API
-          await fetch(`/api/analyses?id=${id}`, { method: 'DELETE' })
-        } catch (error) {
-          console.error('Failed to delete from KV:', error)
+      saveAnalysis: (name: string, results: ProcessSBCResponse) => {
+        // Generate a unique ID for the analysis
+        const id = `analysis-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        
+        // Extract policy names from results
+        const policyNames = results.results
+          .filter(r => r.success && r.data)
+          .map(r => r.data!.plan_summary.plan_name || r.fileName)
+        
+        // Create the analysis object
+        const analysis: SavedAnalysis = {
+          id,
+          name,
+          createdAt: new Date(),
+          results,
+          policyNames,
+          premiums: (results as any).premiums
         }
         
-        // Always delete locally
+        // Save to state (which will be persisted to localStorage)
+        set(state => ({
+          savedAnalyses: [analysis, ...state.savedAnalyses]
+        }))
+        
+        return id
+      },
+      
+      deleteAnalysis: (id: string) => {
+        // Delete from localStorage by updating state
         set(state => ({
           savedAnalyses: state.savedAnalyses.filter(a => a.id !== id)
         }))
-        
-        // Update history
-        await get().loadAnalysisHistory()
       },
       
       getAnalysis: (id: string) => {
         return get().savedAnalyses.find(a => a.id === id)
-      },
-      
-      loadAnalysisFromKV: async (id: string) => {
-        try {
-          const response = await fetch(`/api/analyses?id=${id}`)
-          if (!response.ok) return null
-          
-          const data = await response.json()
-          const analysis: SavedAnalysis = {
-            ...data,
-            createdAt: new Date(data.createdAt),
-            premiums: data.premiums
-          }
-          
-          // Add to local cache
-          set(state => {
-            const existing = state.savedAnalyses.find(a => a.id === id)
-            if (!existing) {
-              return {
-                savedAnalyses: [analysis, ...state.savedAnalyses]
-              }
-            }
-            return state
-          })
-          
-          return analysis
-        } catch (error) {
-          console.error('Failed to load analysis from KV:', error)
-          return null
-        }
-      },
-      
-      loadAnalysisHistory: async () => {
-        try {
-          const response = await fetch('/api/analyses')
-          if (response.ok) {
-            const history = await response.json()
-            set({ analysisHistory: history })
-          }
-        } catch (error) {
-          console.error('Failed to load analysis history:', error)
-        }
       },
       
       updateAnalysisName: (id: string, name: string) => {
@@ -170,26 +79,17 @@ export const useAnalysisStore = create<AnalysisStore>()(
         }))
       },
       
-      clearAllHistory: async () => {
-        try {
-          // Clear from KV via API
-          await fetch('/api/analyses/clear', { method: 'DELETE' })
-        } catch (error) {
-          console.error('Failed to clear KV history:', error)
-        }
-        
-        // Clear locally
+      clearAllHistory: () => {
+        // Clear all analyses from localStorage
         set({
-          savedAnalyses: [],
-          analysisHistory: []
+          savedAnalyses: []
         })
       }
     }),
     {
       name: 'analysis-storage',
       partialize: (state) => ({
-        savedAnalyses: state.savedAnalyses,
-        // Don't persist analysisHistory as it comes from KV
+        savedAnalyses: state.savedAnalyses
       }),
       // Custom serialization to handle Date objects
       serialize: (state) => {

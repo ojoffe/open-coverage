@@ -43,7 +43,7 @@ export function AboutModal({ open, onOpenChange }: AboutModalProps) {
             <h3 className="font-semibold">Our mission:</h3>
             <p className="text-sm">
               We believe US healthcare consumers deserve transparent, accessible tools to understand their coverage options and make informed decisions. 
-              All your data stays private - we don't collect or sell your information.
+              All your data stays private - no information is collected. The only information sent to AI providers is non-identifying information about your health profile.
             </p>
           </div>
 

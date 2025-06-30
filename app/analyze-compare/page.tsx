@@ -3,18 +3,20 @@
 import type React from "react"
 
 import { useState, useEffect, Suspense } from "react"
-import { FileText, Plus, Loader2, CheckCircle } from "lucide-react"
+import { FileText, Plus, Loader2, CheckCircle, Heart, ArrowRight } from "lucide-react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { User } from "lucide-react"
 import Link from "next/link"
 import { processSBCDocuments } from "@/app/actions/process-sbc"
 import type { ProcessSBCResponse } from "@/lib/sbc-schema"
 import PolicyComparison from "@/components/policy-comparison"
 import { useAnalysisStore } from "@/lib/analysis-store"
+import { useHealthProfileStore } from "@/lib/health-profile-store"
 
 interface UploadedFile {
   name: string
@@ -176,7 +178,15 @@ function AnalyzeCompareContent() {
   
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { saveAnalysis, getAnalysis, loadAnalysisFromKV } = useAnalysisStore()
+  const { saveAnalysis, getAnalysis } = useAnalysisStore()
+  const { members } = useHealthProfileStore()
+  
+  // Check if health profile is complete
+  const hasHealthProfile = members.length > 0 && members[0].age && (
+    members[0].conditions.length > 0 || 
+    members[0].medications.length > 0 ||
+    members[0].otherServices?.length > 0
+  )
 
   const MAX_POLICIES = 8
   const uploadedFilesCount = Object.values(files).filter((file) => file !== null).length
@@ -187,22 +197,14 @@ function AnalyzeCompareContent() {
   useEffect(() => {
     const analysisId = searchParams.get('analysis')
     if (analysisId) {
-      // First check local storage
+      // Load from localStorage via the store
       const savedAnalysis = getAnalysis(analysisId)
       if (savedAnalysis) {
         setAnalysisResults(savedAnalysis.results)
         setCurrentAnalysisId(analysisId)
-      } else {
-        // If not found locally, try loading from KV
-        loadAnalysisFromKV(analysisId).then((analysis) => {
-          if (analysis) {
-            setAnalysisResults(analysis.results)
-            setCurrentAnalysisId(analysisId)
-          }
-        })
       }
     }
-  }, [searchParams, getAnalysis, loadAnalysisFromKV])
+  }, [searchParams, getAnalysis])
 
   // Generate analysis name from successful results
   const generateAnalysisName = (results: ProcessSBCResponse): string => {
@@ -305,7 +307,7 @@ function AnalyzeCompareContent() {
         // Save analysis automatically if there are successful results
         if (results.successCount > 0) {
           const analysisName = generateAnalysisName(results)
-          const analysisId = await saveAnalysis(analysisName, results)
+          const analysisId = saveAnalysis(analysisName, results)
           setCurrentAnalysisId(analysisId)
           
           // Redirect to the enhanced analysis page
@@ -376,6 +378,34 @@ function AnalyzeCompareContent() {
                   policies.
                 </p>
               </div>
+              
+              {/* Health Profile Recommendation Box */}
+              {!hasHealthProfile && (
+                <Card className="mb-8 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <CardContent className="p-2">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Heart className="w-6 h-6 text-blue-600" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold mb-2">Get Personalized Recommendations</h3>
+                        <p className="text-gray-600 mb-4">
+                          Complete your health profile first to get accurate cost estimates and personalized policy recommendations based on your specific medical needs.
+                        </p>
+                        <Button asChild>
+                          <Link href="/health-profile">
+                            <User className="w-4 h-4 mr-2" />
+                            Complete Health Profile
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {boxes.map((boxId) => (

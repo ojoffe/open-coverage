@@ -6,7 +6,7 @@ This plan outlines the improvements made to the insurance analysis user experien
 ## Completed Implementations
 
 ### 1. Enhanced /analyze-compare Flow
-**File: `/app/analyze-compare-v2/page.tsx`**
+**File: `/app/analyze-compare/page.tsx`**
 
 #### Features Implemented:
 - **Unified Dashboard**: Single page showing both health profile status and document upload
@@ -90,7 +90,7 @@ Calculates actual out-of-pocket costs:
 ## User Journey Flow
 
 ```
-1. User lands on /analyze-compare-v2
+1. User lands on /analyze-compare
    ↓
 2. Sees health profile status
    - If incomplete → Prompted to complete profile

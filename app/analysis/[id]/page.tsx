@@ -1,3 +1,3 @@
 // Re-export the simplified page as the default
-export { default } from './simplified-page'
+export { default } from './analysis-page'
 export const runtime = 'edge'
