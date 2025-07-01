@@ -68,16 +68,6 @@ export function ProfileCompleteness({
       ] : []
     },
     {
-      name: "Healthcare Providers",
-      score: Math.max(0, Math.min(100, categories.providers || 0)),
-      description: "Doctors and specialists",
-      suggestions: categories.providers === 0 ? [
-        "Add primary care physician",
-        "Include any specialists you see",
-        "Add preferred pharmacy"
-      ] : []
-    },
-    {
       name: "Allergies",
       score: Math.max(0, Math.min(100, categories.history || 0)),
       description: "Known allergies to medications, food, or environment",
@@ -90,12 +80,12 @@ export function ProfileCompleteness({
     {
       name: "Care Preferences",
       score: Math.max(0, Math.min(100, categories.preferences || 0)),
-      description: "Your healthcare priorities",
+      description: "Your lifestyle information",
       suggestions: categories.preferences < 100 ? [
-        "Add expected medical services or select 'None'",
-        "Specify lifestyle factors (smoking, alcohol, exercise)",
-        "Complete all lifestyle information"
-      ] : []
+        "Specify smoking status",
+        "Specify alcohol use",
+        "Specify exercise frequency"
+      ].filter((_, i) => i < Math.ceil((100 - categories.preferences) / 33.34)) : []
     }
   ]
   

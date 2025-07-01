@@ -17,6 +17,7 @@ import type { ProcessSBCResponse } from "@/lib/sbc-schema"
 import PolicyComparison from "@/components/policy-comparison"
 import { useAnalysisStore } from "@/lib/analysis-store"
 import { useHealthProfileStore } from "@/lib/health-profile-store"
+import { useAnalysisHistoryStore } from "@/lib/analysis-history-store"
 
 interface UploadedFile {
   name: string
@@ -181,6 +182,7 @@ function AnalyzeCompareContent() {
   const router = useRouter()
   const { saveAnalysis, getAnalysis } = useAnalysisStore()
   const { members } = useHealthProfileStore()
+  const { addAnalysis } = useAnalysisHistoryStore()
   
   // Check if health profile is complete
   const hasHealthProfile = members.length > 0 && members[0].age && (
@@ -212,9 +214,16 @@ function AnalyzeCompareContent() {
     const successfulResults = results.results.filter(r => r.success && r.data)
     if (successfulResults.length === 0) return 'Analysis'
     
-    const planNames = successfulResults.map(r => 
-      r.data!.planSummary.planName || r.fileName.replace('.pdf', '')
-    ).slice(0, 2) // Take first 2 plan names
+    // Debug the data structure
+    console.log('Successful results data structure:', successfulResults[0]?.data)
+    
+    // Try both planSummary and plan_summary
+    const planNames = successfulResults.map(r => {
+      const planName = r.data!.planSummary?.planName || 
+                      r.data!.plan_summary?.plan_name || 
+                      r.fileName.replace('.pdf', '')
+      return planName
+    }).slice(0, 2) // Take first 2 plan names
     
     if (planNames.length === 1) {
       return planNames[0]
@@ -310,6 +319,43 @@ function AnalyzeCompareContent() {
           const analysisName = generateAnalysisName(results)
           const analysisId = saveAnalysis(analysisName, results)
           setCurrentAnalysisId(analysisId)
+          
+          // Save to analysis history
+          const successfulPolicies = results.results.filter(r => r.success && r.data)
+          const totalCost = successfulPolicies.reduce((sum, r) => {
+            if (!r.data) return sum
+            // Try both costBreakdown and cost_breakdown
+            const monthlyPremium = r.data.costBreakdown?.monthlyPremium || 
+                                  r.data.cost_breakdown?.monthly_premium || 
+                                  0
+            const premium = monthlyPremium * 12
+            return sum + premium
+          }, 0)
+          
+          const historyEntry = {
+            id: analysisId,
+            name: analysisName,
+            date: new Date().toISOString(),
+            policyNames: successfulPolicies.map(r => {
+              const planName = r.data!.planSummary?.planName || 
+                              r.data!.plan_summary?.plan_name || 
+                              r.fileName
+              return planName
+            }),
+            familySize: members.length,
+            totalAnnualCost: totalCost,
+            analysisData: results
+          }
+          
+          console.log('Saving analysis to history:', historyEntry)
+          addAnalysis(historyEntry)
+          
+          // Debug check after saving
+          setTimeout(() => {
+            console.log('LocalStorage after save:')
+            console.log('- analysis-storage:', localStorage.getItem('analysis-storage'))
+            console.log('- coverage-analysis-history:', localStorage.getItem('coverage-analysis-history'))
+          }, 500)
           
           // Redirect to the enhanced analysis page
           router.push(`/analysis/${analysisId}`)

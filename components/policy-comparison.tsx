@@ -1269,10 +1269,12 @@ function AnalysisConfigForm({
 
 function PolicyComparisonTable({ 
   policiesWithResults,
-  analysisResults 
+  analysisResults,
+  networkType = 'in-network'
 }: { 
   policiesWithResults: Array<{ policy: SBCData, result: any }>
   analysisResults?: PolicyAnalysis[]
+  networkType?: 'in-network' | 'out-of-network'
 }) {
   const [selectedModal, setSelectedModal] = useState<SBCData | null>(null)
 
@@ -2156,6 +2158,7 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
           <PolicyComparisonTable 
             policiesWithResults={policiesWithResults} 
             analysisResults={analysisResults}
+            networkType={networkType}
           />
           
           {/* Policy Analysis Component */}
