@@ -1,10 +1,19 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 
-import { FileText, Github, Home, Info, MoreHorizontal, Trash2, Eye, HeartCrack, Wrench, History, Stethoscope, DollarSign, Heart } from "lucide-react"
+import { Eye, FileText, Github, Heart, HeartCrack, Info, MoreHorizontal, Stethoscope, Trash2, Wrench } from "lucide-react"
 
+import { AboutModal } from "@/components/about-modal"
+import { SbcInfoModal } from "@/components/sbc-info-modal"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Sidebar,
   SidebarContent,
@@ -17,17 +26,8 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { SbcInfoModal } from "@/components/sbc-info-modal"
-import { AboutModal } from "@/components/about-modal"
-import { useAnalysisStore } from "@/lib/analysis-store"
 import { useAnalysisHistoryStore } from "@/lib/analysis-history-store"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
+import { useAnalysisStore } from "@/lib/analysis-store"
 import { useRouter } from "next/navigation"
 
 // Define proper types for the navigation items
@@ -75,12 +75,12 @@ const data = {
         //   icon: FileText,
         //   isActive: false,
         // },
-        // {
-        //   title: "Find Optimal Providers",
-        //   url: "/find-providers",
-        //   icon: Stethoscope,
-        //   isActive: false,
-        // },
+        {
+          title: "Find Optimal Providers",
+          url: "/find-providers",
+          icon: Stethoscope,
+          isActive: false,
+        },
       ] as NavigationItem[],
     },
     {

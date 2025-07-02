@@ -1,10 +1,11 @@
-import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import type React from "react"
 import "./globals.css"
 
-import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
+import { PolicyProvider } from "@/components/policy-context"
+import { SidebarProvider } from "@/components/ui/sidebar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,10 +23,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <SidebarProvider>
-          <AppSidebar />
-          {children}
-        </SidebarProvider>
+          <PolicyProvider>
+            <SidebarProvider>
+              <AppSidebar />
+              {children}
+            </SidebarProvider>
+          </PolicyProvider>
       </body>
     </html>
   )

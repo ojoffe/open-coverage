@@ -27,11 +27,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-    useCategoryAnalysis,
-    useInsuranceSettings,
-    useSituationSuggestions
+  useCategoryAnalysis,
+  useInsuranceSettings,
+  useSituationSuggestions
 } from "@/hooks"
-import { useComposerRuntime } from "@assistant-ui/react"
 import { ChevronRight, Home } from "lucide-react"
 import { useCallback } from "react"
 import { Thread } from "./assistant-ui/thread"
@@ -54,7 +53,7 @@ export default function PolicyAnalysis() {
   const { policy } = usePolicy();
   
   /** Get composer runtime for chat integration */
-  const composerRuntime = useComposerRuntime();
+  // const composerRuntime = useComposerRuntime();
 
   /** Centralized insurance settings management */
   const {
@@ -100,8 +99,8 @@ export default function PolicyAnalysis() {
     onSuggestionClick: (suggestion: string) => {
       // Send suggestion to chat interface
       console.log("Suggestion clicked:", suggestion);
-      composerRuntime.setText(suggestion);
-      composerRuntime.send();
+      // composerRuntime.setText(suggestion);
+      // composerRuntime.send();
     },
   });
 

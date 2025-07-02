@@ -1,26 +1,23 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Eye, Search, X, Star, ExternalLink, FileText, MoreHorizontal, Plus, Trash2, Pill } from "lucide-react"
-import type { ProcessSBCResponse, SBCData } from "@/lib/sbc-schema"
-import { useHealthProfileStore } from "@/lib/health-profile-store"
 import { calculatePolicyAnalysis, type AnalysisConfig, type PolicyAnalysis } from "@/app/actions/calculate-analysis"
 import { runEnhancedPolicyAnalysis, type EnhancedPolicyAnalysis } from "@/app/actions/enhanced-analysis"
-import { retrievePricingForAnalysis, type PricingRetrievalResult, type ServicePricing } from "@/app/actions/retrieve-pricing"
-import { recalculateHealthUsage, type RecalculatedHealthUsage } from "@/app/actions/recalculate-health-usage"
-import { SmartAnalysisButton } from "@/components/smart-analysis-button"
+import { retrievePricingForAnalysis, type PricingRetrievalResult } from "@/app/actions/retrieve-pricing"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useHealthProfileStore } from "@/lib/health-profile-store"
 import { getCategoryColor } from "@/lib/medication-categories"
-import PolicyAnalysisComponent, { type PolicyAnalysisResult } from "@/components/policy-analysis"
+import type { ProcessSBCResponse, SBCData } from "@/lib/sbc-schema"
+import { Eye, FileText, MoreHorizontal, Pill, Plus, Search, Star, Trash2, X } from "lucide-react"
+import React, { useState } from "react"
+import { SmartAnalysisButton } from "./smart-analysis-button"
 
 interface PolicyComparisonProps {
   results: ProcessSBCResponse
@@ -2160,9 +2157,25 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
             analysisResults={analysisResults}
             networkType={networkType}
           />
+
+          <SmartAnalysisButton
+            sbcResults={results}
+            members={members}
+            location="United States" // TODO: Get actual location from user
+            onComplete={handleUnifiedAnalysisComplete}
+          />
+
+
+          {/* <SimplifiedPolicyAnalysis
+            policies={successfulPolicies}
+            healthProfile={members}
+            onAnalysisComplete={(results: PolicyAnalysisResult[]) => {
+              setAnalysisResults(results)
+            }}
+          /> */}
           
           {/* Policy Analysis Component */}
-          <PolicyAnalysisComponent
+          {/* <PolicyAnalysisComponent
             policies={successfulPolicies}
             healthProfile={members}
             onAnalysisComplete={(results: PolicyAnalysisResult[]) => {
@@ -2210,7 +2223,7 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
               }))
               setAnalysisResults(convertedResults)
             }}
-          />
+          /> */}
         </TabsContent>
         
         <TabsContent value="categories" className="space-y-6">

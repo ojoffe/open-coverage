@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbLink } from "@/components/ui/breadcrumb"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft, User, Loader2 } from "lucide-react"
-import Link from "next/link"
 import PolicyComparison from "@/components/policy-comparison"
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { useAnalysisStore } from "@/lib/analysis-store"
 import type { ProcessSBCResponse } from "@/lib/sbc-schema"
+import { ArrowLeft, Loader2, User } from "lucide-react"
+import Link from "next/link"
+import { useParams, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export default function AnalysisPage() {
   const params = useParams()
@@ -122,58 +122,61 @@ export default function AnalysisPage() {
     ? `${analysisName.substring(0, 20)}...` 
     : analysisName || "Analysis"
 
+  
   return (
-    <SidebarInset>
-      <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background px-2 sm:px-4">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 h-4" />
-        <div className="flex-1 min-w-0">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden sm:block">
-                <BreadcrumbLink href="/analyze-compare">Analyze & Compare</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem>
-                <BreadcrumbPage className="truncate max-w-[150px] sm:max-w-none">
-                  {displayName}
-                </BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+   
+      <SidebarInset>
+        <header className="sticky top-0 z-10 flex h-14 sm:h-16 shrink-0 items-center gap-2 border-b bg-background px-2 sm:px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="mr-2 h-4" />
+          <div className="flex-1 min-w-0">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden sm:block">
+                  <BreadcrumbLink href="/analyze-compare">Analyze & Compare</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="truncate max-w-[150px] sm:max-w-none">
+                    {displayName}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => router.push("/analyze-compare")}
+              className="hidden sm:flex"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => router.push("/analyze-compare")}
+              className="sm:hidden h-8 w-8 p-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" asChild className="hidden sm:flex">
+              <Link href="/health-profile">
+                <User className="w-4 h-4 mr-2" />
+                Health Profile
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild className="sm:hidden h-8 w-8 p-0">
+              <Link href="/health-profile">
+                <User className="w-4 h-4" />
+              </Link>
+            </Button>
+          </div>
+        </header>
+        <div className="p-4">
+            <PolicyComparison results={analysisResults} />
         </div>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => router.push("/analyze-compare")}
-            className="hidden sm:flex"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => router.push("/analyze-compare")}
-            className="sm:hidden h-8 w-8 p-0"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-            <Link href="/health-profile">
-              <User className="w-4 h-4 mr-2" />
-              Health Profile
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild className="sm:hidden h-8 w-8 p-0">
-            <Link href="/health-profile">
-              <User className="w-4 h-4" />
-            </Link>
-          </Button>
-        </div>
-      </header>
-
-      <PolicyComparison results={analysisResults} />
-    </SidebarInset>
+      </SidebarInset>
   )
 }
