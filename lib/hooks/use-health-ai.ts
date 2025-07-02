@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useHealthProfileStore } from "@/lib/health-profile-store";
+import type { HealthSuggestion, HealthSuggestionsResponse } from "@/app/api/health-suggestions/route";
 
 interface HealthAnalysis {
   riskScore: number;
@@ -90,34 +91,26 @@ export function useHealthAI() {
   }, [members]);
   
   const getConditionSuggestions = useCallback(async (
-    age: number,
-    gender: string,
-    existingConditions: string[] = [],
-    symptoms: string[] = []
-  ): Promise<{
-    suggestions: ConditionSuggestion[];
-    preventiveCare: Array<{
-      name: string;
-      frequency: string;
-      nextDue?: string;
-      reason: string;
-    }>;
-  } | null> => {
+    query: string,
+    existingConditions: string[] = []
+  ): Promise<HealthSuggestion[] | null> => {
     try {
       const response = await fetch("/api/health-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          query,
           type: "conditions",
-          context: { age, gender, existingConditions, symptoms },
+          existingValues: existingConditions,
         }),
       });
       
       if (!response.ok) {
-        throw new Error("Failed to get suggestions");
+        throw new Error("Failed to get condition suggestions");
       }
       
-      return await response.json();
+      const data: HealthSuggestionsResponse = await response.json();
+      return data.suggestions;
     } catch (err) {
       console.error("Condition suggestions error:", err);
       return null;
@@ -125,34 +118,82 @@ export function useHealthAI() {
   }, []);
   
   const getMedicationSuggestions = useCallback(async (
-    conditions: string[] = [],
+    query: string,
     existingMedications: string[] = []
-  ): Promise<{
-    suggestions: MedicationSuggestion[];
-    interactions?: Array<{
-      drug1: string;
-      drug2: string;
-      severity: string;
-      description: string;
-    }>;
-  } | null> => {
+  ): Promise<HealthSuggestion[] | null> => {
     try {
       const response = await fetch("/api/health-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          query,
           type: "medications",
-          context: { conditions, existingMedications },
+          existingValues: existingMedications,
         }),
       });
       
       if (!response.ok) {
-        throw new Error("Failed to get suggestions");
+        throw new Error("Failed to get medication suggestions");
       }
       
-      return await response.json();
+      const data: HealthSuggestionsResponse = await response.json();
+      return data.suggestions;
     } catch (err) {
       console.error("Medication suggestions error:", err);
+      return null;
+    }
+  }, []);
+
+  const getAllergySuggestions = useCallback(async (
+    query: string,
+    existingAllergies: string[] = []
+  ): Promise<HealthSuggestion[] | null> => {
+    try {
+      const response = await fetch("/api/health-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          type: "allergies",
+          existingValues: existingAllergies,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to get allergy suggestions");
+      }
+      
+      const data: HealthSuggestionsResponse = await response.json();
+      return data.suggestions;
+    } catch (err) {
+      console.error("Allergy suggestions error:", err);
+      return null;
+    }
+  }, []);
+
+  const getServiceSuggestions = useCallback(async (
+    query: string,
+    existingServices: string[] = []
+  ): Promise<HealthSuggestion[] | null> => {
+    try {
+      const response = await fetch("/api/health-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          type: "services",
+          existingValues: existingServices,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to get service suggestions");
+      }
+      
+      const data: HealthSuggestionsResponse = await response.json();
+      return data.suggestions;
+    } catch (err) {
+      console.error("Service suggestions error:", err);
       return null;
     }
   }, []);
@@ -161,6 +202,8 @@ export function useHealthAI() {
     analyzeHealthProfile,
     getConditionSuggestions,
     getMedicationSuggestions,
+    getAllergySuggestions,
+    getServiceSuggestions,
     analysis,
     isAnalyzing,
     error,

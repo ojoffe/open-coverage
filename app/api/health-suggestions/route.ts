@@ -1,6 +1,23 @@
 import { NextResponse } from "next/server"
-import { openai } from "@ai-sdk/openai"
-import { generateText } from "ai"
+import { groq } from "@ai-sdk/groq"
+import { generateObject } from "ai"
+import { z } from "zod"
+
+// Define the suggestion schema
+const suggestionSchema = z.object({
+  value: z.string().describe("Unique identifier for the suggestion"),
+  label: z.string().describe("Human-readable display name"),
+  category: z.string().describe("Category or classification of the suggestion"),
+  details: z.string().optional().describe("Additional details, description, or context")
+})
+
+// Schema for the complete response
+const healthSuggestionsResponseSchema = z.object({
+  suggestions: z.array(suggestionSchema).max(10).describe("Array of health suggestions relevant to the search query")
+})
+
+export type HealthSuggestion = z.infer<typeof suggestionSchema>
+export type HealthSuggestionsResponse = z.infer<typeof healthSuggestionsResponseSchema>
 
 export async function POST(req: Request) {
   try {
@@ -10,36 +27,79 @@ export async function POST(req: Request) {
       return NextResponse.json({ suggestions: [] })
     }
 
-    const prompts = {
-      conditions: `Given the search query "${query}" for medical conditions, suggest up to 10 relevant medical conditions that match or are related to this query. Focus on common conditions that people might have. Exclude conditions that are already selected: ${existingValues.join(", ")}. Return as JSON array with format: [{"value": "condition_name", "label": "Display Name", "category": "Category", "details": "Brief description or ICD code"}]`,
+    // Build context for AI based on search type
+    const typePrompts = {
+      conditions: {
+        system: "You are a medical assistant helping users find relevant medical conditions. Provide accurate, commonly recognized medical conditions that match the search query.",
+        context: `Search query: "${query}"
+Type: Medical conditions
+Exclude already selected: ${existingValues.join(", ")}
+
+Guidelines:
+- Focus on common, well-recognized medical conditions
+- Use proper medical terminology
+- Include ICD-10 codes in details when applicable
+- Categorize by body system or condition type
+- Prioritize conditions most likely to match the search intent`
+      },
       
-      medications: `Given the search query "${query}" for medications, suggest up to 10 relevant medications (brand names or generic names) that match or are related to this query. Focus on commonly prescribed medications. Exclude medications that are already selected: ${existingValues.join(", ")}. Return as JSON array with format: [{"value": "med_name", "label": "Display Name", "category": "Drug Class", "details": "Generic name, indication, or notes"}]`,
+      medications: {
+        system: "You are a pharmacist assistant helping users find relevant medications. Provide accurate medication names (both brand and generic) that match the search query.",
+        context: `Search query: "${query}"
+Type: Medications
+Exclude already selected: ${existingValues.join(", ")}
+
+Guidelines:
+- Include both brand names and generic names when relevant
+- Categorize by drug class or therapeutic use
+- Include generic name and drug class in details
+- Note if medication is specialty or high-cost
+- Focus on commonly prescribed medications`
+      },
       
-      allergies: `Given the search query "${query}" for allergies, suggest up to 10 relevant allergens that match or are related to this query. Include medications, foods, environmental allergens, etc. Exclude allergies that are already selected: ${existingValues.join(", ")}. Return as JSON array with format: [{"value": "allergen_name", "label": "Display Name", "category": "Type", "details": "Common reactions or notes"}]`,
+      allergies: {
+        system: "You are a medical assistant helping users identify potential allergens. Provide accurate allergen names that match the search query.",
+        context: `Search query: "${query}"
+Type: Allergies/Allergens
+Exclude already selected: ${existingValues.join(", ")}
+
+Guidelines:
+- Include medications, foods, environmental allergens, and other substances
+- Categorize by allergen type (medication, food, environmental, etc.)
+- Include common reaction types or severity in details
+- Focus on clinically relevant allergens
+- Use standard allergen terminology`
+      },
       
-      services: `Given the search query "${query}" for medical services, suggest up to 10 relevant medical services or procedures that match or are related to this query. Focus on services covered by health insurance. Exclude services that are already selected: ${existingValues.join(", ")}. Return as JSON array with format: [{"value": "service_name", "label": "Display Name", "category": "Service Type", "details": "Brief description"}]`
+      services: {
+        system: "You are a healthcare administrator helping users find relevant medical services. Provide accurate medical service names that match the search query.",
+        context: `Search query: "${query}"
+Type: Medical services
+Exclude already selected: ${existingValues.join(", ")}
+
+Guidelines:
+- Focus on services typically covered by health insurance
+- Use terminology consistent with insurance benefit categories
+- Categorize by service type (primary care, specialty, diagnostic, etc.)
+- Include brief descriptions of what the service involves
+- Consider both inpatient and outpatient services`
+      }
     }
 
-    const prompt = prompts[type as keyof typeof prompts]
-    if (!prompt) {
+    const promptConfig = typePrompts[type as keyof typeof typePrompts]
+    if (!promptConfig) {
       return NextResponse.json({ suggestions: [] })
     }
 
-    const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
-      prompt: prompt,
+    const result = await generateObject({
+      model: groq("llama-3.3-70b-versatile"),
+      schema: healthSuggestionsResponseSchema,
+      system: promptConfig.system,
+      prompt: promptConfig.context,
       temperature: 0.3,
-      maxTokens: 1000,
     })
 
-    // Parse the response
-    try {
-      const suggestions = JSON.parse(text)
-      return NextResponse.json({ suggestions: Array.isArray(suggestions) ? suggestions : [] })
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError)
-      return NextResponse.json({ suggestions: [] })
-    }
+    return NextResponse.json(result.object)
   } catch (error) {
     console.error("Health suggestions API error:", error)
     return NextResponse.json({ suggestions: [] })

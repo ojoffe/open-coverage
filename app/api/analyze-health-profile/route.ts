@@ -1,7 +1,6 @@
 import { generateObject } from "ai";
 import { groq } from "@ai-sdk/groq";
 import { z } from "zod";
-import { useHealthProfileStore } from "@/lib/health-profile-store";
 import { generateHealthProfileSummary } from "@/lib/health-profile-utils";
 
 export const runtime = "edge";
@@ -25,11 +24,11 @@ const healthProfileAnalysisSchema = z.object({
   })),
   
   expectedCosts: z.object({
-    lowEstimate: z.number().describe("Low estimate annual healthcare costs"),
-    highEstimate: z.number().describe("High estimate annual healthcare costs"),
+    lowEstimate: z.number().max(500000).describe("Low estimate annual healthcare costs"),
+    highEstimate: z.number().max(1000000).describe("High estimate annual healthcare costs"),
     breakdown: z.array(z.object({
       category: z.string(),
-      annualCost: z.number(),
+      annualCost: z.number().max(250000),
     })),
   }),
   

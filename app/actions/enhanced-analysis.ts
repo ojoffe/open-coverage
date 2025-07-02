@@ -4,6 +4,11 @@ import type { SBCData } from "@/lib/sbc-schema"
 import type { HealthProfileMember } from "@/lib/health-profile-store"
 import { getMedicalCostEstimate, getBatchMedicalCosts, type CostEstimate } from "./get-medical-costs"
 import type { AnalysisConfig, PolicyAnalysis, MemberCostBreakdown } from "./calculate-analysis"
+import { 
+  getConditionRiskAssessment, 
+  calculateMemberRiskScore, 
+  predictHealthcareUtilization 
+} from "@/lib/health-risk-assessment"
 
 // Common drug type classifications
 function predictDrugType(medicationName: string): 'generic' | 'preferred' | 'specialty' {
@@ -76,6 +81,13 @@ interface EnhancedMemberBreakdown extends Omit<MemberCostBreakdown, 'primaryCare
     costData: EnhancedCostData; 
     total: number 
   }>
+  riskAssessment: {
+    riskLevel: 'low' | 'moderate' | 'high' | 'very_high'
+    riskScore: number
+    emergencyRisk: number
+    hospitalizationRisk: number
+    relatedConditionRisks: { condition: string; risk: number }[]
+  }
 }
 
 export interface EnhancedPolicyAnalysis extends Omit<PolicyAnalysis, 'memberBreakdowns'> {
@@ -235,55 +247,25 @@ async function calculateEnhancedMemberCosts(
   // Calculate visit counts based on age and health profile
   const age = member.age || 25 // Default to adult if age not specified
   
-  // Age-based healthcare utilization patterns
-  let basePrimaryCareVisits = 2 // Default adult baseline
-  let baseDiagnosticTests = 1 // Default adult baseline
+  // Use our new risk assessment system to predict healthcare utilization
+  const utilization = predictHealthcareUtilization(
+    member.conditions,
+    member.medications,
+    age
+  )
   
-  // Adjust based on age groups following medical best practices
-  if (age < 2) {
-    basePrimaryCareVisits = 8 // Monthly for first year, then quarterly
-    baseDiagnosticTests = 3 // Multiple screenings, hearing, vision, development
-  } else if (age < 6) {
-    basePrimaryCareVisits = 4 // Quarterly visits
-    baseDiagnosticTests = 2 // Annual screenings plus additional as needed
-  } else if (age < 13) {
-    basePrimaryCareVisits = 2 // Annual well-child + sick visits
-    baseDiagnosticTests = 1 // Annual screenings
-  } else if (age < 18) {
-    basePrimaryCareVisits = 2 // Annual physical + additional care
-    baseDiagnosticTests = 1 // Annual screenings
-  } else if (age < 30) {
-    basePrimaryCareVisits = 1 // Many young adults skip annual visits
-    baseDiagnosticTests = 1 // Basic annual screening
-  } else if (age < 40) {
-    basePrimaryCareVisits = 2 // Annual physical + occasional sick visits
-    baseDiagnosticTests = 1 // Annual screenings
-  } else if (age < 50) {
-    basePrimaryCareVisits = 2 // Annual physical + follow-ups
-    baseDiagnosticTests = 2 // More comprehensive screenings
-  } else if (age < 65) {
-    basePrimaryCareVisits = 3 // More frequent monitoring
-    baseDiagnosticTests = 3 // Colonoscopy, mammograms, etc.
-  } else if (age < 75) {
-    basePrimaryCareVisits = 4 // Quarterly check-ins
-    baseDiagnosticTests = 3 // Regular screenings and monitoring
-  } else {
-    basePrimaryCareVisits = 6 // More frequent visits for safety and health
-    baseDiagnosticTests = 4 // Comprehensive monitoring
-  }
+  // Calculate member risk score
+  const riskAssessment = calculateMemberRiskScore(member.conditions, age)
   
-  const primaryCareCount = basePrimaryCareVisits + member.conditions.length
+  // Use the predicted utilization from our risk assessment
+  const primaryCareCount = utilization.annualPrimaryCareVisits
+  const specialistCount = utilization.annualSpecialistVisits
+  const diagnosticCount = utilization.annualDiagnosticTests
   
-  // Specialist visits: age-adjusted baseline plus condition-driven needs
-  let specialistCount = member.conditions.length
-  if (age >= 50) {
-    specialistCount += 1 // Likely to see at least one specialist annually (cardio, eye, etc.)
-  }
-  if (age >= 65) {
-    specialistCount += 1 // Additional specialists for senior care
-  }
-  
-  const diagnosticCount = baseDiagnosticTests + Math.floor(member.conditions.length / 2)
+  // Log risk assessment for debugging
+  console.log(`Member risk assessment: Risk Level: ${riskAssessment.riskLevel}, Score: ${riskAssessment.totalRiskScore}`)
+  console.log(`Predicted utilization: PC: ${primaryCareCount}, Spec: ${specialistCount}, Diag: ${diagnosticCount}`)
+  console.log(`Emergency risk: ${utilization.annualEmergencyRisk}%, Hospitalization risk: ${utilization.annualHospitalizationRisk}%`)
   
   // Create enhanced cost data
   const primaryCareCostData: EnhancedCostData = {
@@ -385,7 +367,14 @@ async function calculateEnhancedMemberCosts(
     medications: { count: member.medications.length * 12, costData: medicationCostData, total: medicationTotal },
     diagnosticTests: { count: diagnosticCount, costData: diagnosticCostData, total: diagnosticTotal },
     plannedVisits,
-    memberTotal
+    memberTotal,
+    riskAssessment: {
+      riskLevel: riskAssessment.riskLevel,
+      riskScore: riskAssessment.totalRiskScore,
+      emergencyRisk: utilization.annualEmergencyRisk,
+      hospitalizationRisk: utilization.annualHospitalizationRisk,
+      relatedConditionRisks: utilization.relatedConditionRisks
+    }
   }
 }
 
@@ -436,15 +425,15 @@ export async function runEnhancedPolicyAnalysis(
     
     // Apply insurance calculations
     const relevantDeductible = healthProfile.length > 1 
-      ? policy.important_questions.overall_deductible.family
-      : policy.important_questions.overall_deductible.individual
+      ? policy.important_questions.overall_deductible.in_network.family
+      : policy.important_questions.overall_deductible.in_network.individual
     
     const deductibleApplied = Math.min(totalMedicalCosts, relevantDeductible)
     const coinsuranceApplied = Math.max(0, totalMedicalCosts - relevantDeductible) * 0.2
     
     const outOfPocketMax = healthProfile.length > 1
-      ? policy.important_questions.out_of_pocket_limit_for_plan.family
-      : policy.important_questions.out_of_pocket_limit_for_plan.individual
+      ? policy.important_questions.out_of_pocket_limit_for_plan.in_network.family
+      : policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual
     
     const finalMedicalCosts = Math.min(deductibleApplied + coinsuranceApplied, outOfPocketMax)
     const totalAnnualCost = (estimatedMonthlyPremium * 12) + finalMedicalCosts

@@ -33,69 +33,59 @@ export function ProfileCompleteness({
 }: ProfileCompletenessProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   
-  // Ensure score is valid
-  const safeOverallScore = isNaN(overallScore) || !isFinite(overallScore) ? 0 : overallScore
+  // Ensure score is valid and bounded between 0 and 100
+  const safeOverallScore = Math.max(0, Math.min(100, isNaN(overallScore) || !isFinite(overallScore) ? 0 : overallScore))
   
   const categoryDetails: CompletenessCategory[] = [
     {
       name: "Demographics",
-      score: categories.demographics,
+      score: Math.max(0, Math.min(100, categories.demographics || 0)),
       description: "Basic information about the member",
       suggestions: categories.demographics < 100 ? [
-        "Add date of birth",
+        "Add age",
         "Include height and weight",
         "Specify gender (optional)"
       ].filter((_, i) => i < Math.ceil((100 - categories.demographics) / 33)) : []
     },
     {
       name: "Medical Conditions",
-      score: categories.conditions,
+      score: Math.max(0, Math.min(100, categories.conditions || 0)),
       description: "Pre-existing conditions and diagnoses",
       suggestions: categories.conditions < 100 ? [
-        "Add severity levels to conditions",
-        "Include diagnosis dates",
-        "Specify managing specialists"
+        "Add any pre-existing medical conditions",
+        "Include chronic conditions",
+        "Or select 'No pre-existing conditions'"
       ] : []
     },
     {
       name: "Medications",
-      score: categories.medications,
+      score: Math.max(0, Math.min(100, categories.medications || 0)),
       description: "Current medications and dosages",
       suggestions: categories.medications < 100 ? [
-        "Add dosage information",
-        "Specify frequency of use",
-        "Include prescribing doctor"
+        "Add any prescription medications",
+        "Include over-the-counter medications",
+        "Or select 'No current medications'"
       ] : []
     },
     {
-      name: "Healthcare Providers",
-      score: categories.providers,
-      description: "Doctors and specialists",
-      suggestions: categories.providers === 0 ? [
-        "Add primary care physician",
-        "Include any specialists you see",
-        "Add preferred pharmacy"
-      ] : []
-    },
-    {
-      name: "Medical History",
-      score: categories.history,
-      description: "Past surgeries and hospitalizations",
+      name: "Allergies",
+      score: Math.max(0, Math.min(100, categories.history || 0)),
+      description: "Known allergies to medications, food, or environment",
       suggestions: categories.history === 0 ? [
-        "Add any past surgeries",
-        "Include hospitalization history",
-        "Record preventive care visits"
+        "Add any known allergies",
+        "Include medication allergies",
+        "Or confirm 'No known allergies'"
       ] : []
     },
     {
       name: "Care Preferences",
-      score: categories.preferences,
-      description: "Your healthcare priorities",
-      suggestions: categories.preferences === 0 ? [
-        "Set care priorities (cost vs. quality)",
-        "Specify travel distance preferences",
-        "Indicate telemedicine preferences"
-      ] : []
+      score: Math.max(0, Math.min(100, categories.preferences || 0)),
+      description: "Your lifestyle information",
+      suggestions: categories.preferences < 100 ? [
+        "Specify smoking status",
+        "Specify alcohol use",
+        "Specify exercise frequency"
+      ].filter((_, i) => i < Math.ceil((100 - categories.preferences) / 33.34)) : []
     }
   ]
   

@@ -2,6 +2,7 @@
 
 import type { SBCData } from "@/lib/sbc-schema"
 import type { HealthProfileMember } from "@/lib/health-profile-store"
+import { categorizeMedication, medicationCategories, getMedicationCostEstimate } from "@/lib/medication-categories"
 
 export interface AnalysisConfig {
   currentDeductible: number
@@ -9,11 +10,21 @@ export interface AnalysisConfig {
   networkType: 'in-network' | 'out-of-network' | 'both'
 }
 
+export interface MedicationDetail {
+  name: string
+  category: string
+  categoryDisplay: string
+  fillsPerYear: number
+  costPerFill: number
+  annualCost: number
+}
+
 export interface MemberCostBreakdown {
   memberIndex: number
   primaryCareVisits: { count: number; costPerVisit: number; total: number }
   specialistVisits: { count: number; costPerVisit: number; total: number }
   medications: { count: number; costPerFill: number; total: number }
+  medicationDetails?: MedicationDetail[]
   diagnosticTests: { count: number; costPerTest: number; total: number }
   plannedVisits: Array<{ name: string; frequency: number; costPerVisit: number; total: number }>
   memberTotal: number
@@ -111,9 +122,45 @@ function calculateMemberCosts(
   const specialistCount = member.conditions.length
   const specialistTotal = specialistCost * specialistCount
 
-  // Medications: 12 fills per medication per year
-  const medicationCount = member.medications.length * 12
-  const medicationTotal = genericMedCost * medicationCount
+  // Medications: Calculate based on category
+  const medicationDetails: MedicationDetail[] = []
+  let medicationTotal = 0
+  let medicationCount = 0
+  
+  for (const medication of member.medications) {
+    if (medication === 'NONE') continue
+    
+    const category = categorizeMedication(medication)
+    const categoryInfo = medicationCategories[category]
+    
+    // Get specific medication costs from policy if available
+    let costPerFill = genericMedCost // Default to generic cost
+    
+    // Check for specific medication tiers in policy
+    if (category === 'specialty') {
+      costPerFill = calculateServiceCost(policy, 'specialty', 1, config.networkType) || 250
+    } else if (category === 'preferred-brand' || category === 'non-preferred-brand') {
+      costPerFill = calculateServiceCost(policy, 'brand', 1, config.networkType) || 
+                   getMedicationCostEstimate(medication, category)
+    } else if (category === 'preventive') {
+      costPerFill = 0 // Preventive medications are typically covered at no cost
+    }
+    
+    const fillsPerYear = 12 // Monthly fills
+    const annualCost = costPerFill * fillsPerYear
+    
+    medicationDetails.push({
+      name: medication,
+      category: category,
+      categoryDisplay: categoryInfo.displayName,
+      fillsPerYear,
+      costPerFill,
+      annualCost
+    })
+    
+    medicationTotal += annualCost
+    medicationCount += fillsPerYear
+  }
 
   // Diagnostic tests: 1 annual + 1 per condition
   const diagnosticCount = 1 + member.conditions.length
@@ -139,7 +186,8 @@ function calculateMemberCosts(
     memberIndex,
     primaryCareVisits: { count: primaryCareCount, costPerVisit: primaryCareCost, total: primaryCareTotal },
     specialistVisits: { count: specialistCount, costPerVisit: specialistCost, total: specialistTotal },
-    medications: { count: medicationCount, costPerFill: genericMedCost, total: medicationTotal },
+    medications: { count: medicationCount, costPerFill: medicationTotal / medicationCount || 0, total: medicationTotal },
+    medicationDetails: medicationDetails.length > 0 ? medicationDetails : undefined,
     diagnosticTests: { count: diagnosticCount, costPerTest: diagnosticCost, total: diagnosticTotal },
     plannedVisits,
     memberTotal
@@ -170,8 +218,8 @@ export async function calculatePolicyAnalysis(
     
     // Apply deductible
     const relevantDeductible = healthProfile.length > 1 
-      ? policy.important_questions.overall_deductible.family
-      : policy.important_questions.overall_deductible.individual
+      ? policy.important_questions.overall_deductible.in_network.family
+      : policy.important_questions.overall_deductible.in_network.individual
     
     const deductibleApplied = Math.min(totalMedicalCosts, relevantDeductible)
     
@@ -180,8 +228,8 @@ export async function calculatePolicyAnalysis(
     
     // Cap at out-of-pocket maximum
     const outOfPocketMax = healthProfile.length > 1
-      ? policy.important_questions.out_of_pocket_limit_for_plan.family
-      : policy.important_questions.out_of_pocket_limit_for_plan.individual
+      ? policy.important_questions.out_of_pocket_limit_for_plan.in_network.family
+      : policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual
     
     const finalMedicalCosts = Math.min(deductibleApplied + coinsuranceApplied, outOfPocketMax)
     const totalAnnualCost = (estimatedMonthlyPremium * 12) + finalMedicalCosts

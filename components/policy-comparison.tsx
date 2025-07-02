@@ -11,13 +11,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Eye, Search, X, Star, ExternalLink, FileText, MoreHorizontal, Plus, Trash2 } from "lucide-react"
+import { Eye, Search, X, Star, ExternalLink, FileText, MoreHorizontal, Plus, Trash2, Pill } from "lucide-react"
 import type { ProcessSBCResponse, SBCData } from "@/lib/sbc-schema"
 import { useHealthProfileStore } from "@/lib/health-profile-store"
 import { calculatePolicyAnalysis, type AnalysisConfig, type PolicyAnalysis } from "@/app/actions/calculate-analysis"
 import { runEnhancedPolicyAnalysis, type EnhancedPolicyAnalysis } from "@/app/actions/enhanced-analysis"
 import { retrievePricingForAnalysis, type PricingRetrievalResult, type ServicePricing } from "@/app/actions/retrieve-pricing"
 import { recalculateHealthUsage, type RecalculatedHealthUsage } from "@/app/actions/recalculate-health-usage"
+import { SmartAnalysisButton } from "@/components/smart-analysis-button"
+import { getCategoryColor } from "@/lib/medication-categories"
+import PolicyAnalysisComponent, { type PolicyAnalysisResult } from "@/components/policy-analysis"
 
 interface PolicyComparisonProps {
   results: ProcessSBCResponse
@@ -47,6 +50,46 @@ interface CategorySearchResult {
     grade: string
     reasoning: string
   }>
+}
+
+interface CategoryAnalysisResult {
+  category: string
+  description: string
+  relatedServices: Array<{
+    serviceName: string
+    description: string
+    estimatedFrequency: string
+    relevanceReason: string
+    policyPricing: Array<{
+      policyName: string
+      inNetworkCost: string
+      outOfNetworkCost: string
+      actualCostAfterDeductible: string
+      limitations?: string
+    }>
+  }>
+  suggestedSubcategories: Array<{
+    name: string
+    description: string
+    searchTerm: string
+  }>
+  policyGrades: Array<{
+    policyName: string
+    grade: 'A' | 'B' | 'C' | 'D' | 'F'
+    reasoning: string
+    estimatedCost: string
+    coverageHighlights: string[]
+    costFactors: string[]
+  }>
+  overallInsights: string[]
+}
+
+interface CategoryAnalysisInput {
+  searchTerm: string
+  policies: SBCData[]
+  networkType: 'in-network' | 'out-of-network'
+  currentDeductible: number
+  currentOutOfPocket: number
 }
 
 interface HealthProfile {
@@ -90,6 +133,26 @@ const DEFAULT_HEALTH_PROFILE: HealthProfile = {
   },
   diagnosticTests: 2, // Basic annual labs
   imaging: 0
+}
+
+// Mock function for category analysis
+async function analyzeCareCategory(input: CategoryAnalysisInput): Promise<CategoryAnalysisResult> {
+  // This is a mock implementation for testing
+  return {
+    category: input.searchTerm,
+    description: `Analysis of ${input.searchTerm} coverage across your policies.`,
+    relatedServices: [],
+    suggestedSubcategories: [],
+    policyGrades: input.policies.map(policy => ({
+      policyName: policy.plan_summary.plan_name,
+      grade: 'C' as const,
+      reasoning: 'Analysis temporarily unavailable',
+      estimatedCost: 'Contact provider',
+      coverageHighlights: ['Review policy documents'],
+      costFactors: ['Unable to analyze']
+    })),
+    overallInsights: ['Analysis temporarily unavailable - please try again or contact your insurance provider']
+  }
 }
 
 // Predefined medical categories and their subcategories
@@ -225,8 +288,8 @@ function calculatePolicyGrade(policy: SBCData, healthProfile: HealthProfile = DE
   totalAnnualCost += estimatedMonthlyPremium * 12
   
   // Deductible impact
-  const deductible = policy.important_questions.overall_deductible.individual
-  const familyDeductible = policy.important_questions.overall_deductible.family
+  const deductible = policy.important_questions.overall_deductible.in_network.individual
+  const familyDeductible = policy.important_questions.overall_deductible.in_network.family
   const relevantDeductible = healthProfile.familySize > 1 ? familyDeductible : deductible
   
   // Calculate expected medical costs
@@ -278,8 +341,8 @@ function calculatePolicyGrade(policy: SBCData, healthProfile: HealthProfile = DE
   
   // Cap at out-of-pocket maximum
   const outOfPocketMax = healthProfile.familySize > 1 
-    ? policy.important_questions.out_of_pocket_limit_for_plan.family
-    : policy.important_questions.out_of_pocket_limit_for_plan.individual
+    ? policy.important_questions.out_of_pocket_limit_for_plan.in_network.family
+    : policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual
   
   const medicalOutOfPocket = Math.min(deductiblePayment + afterDeductibleCosts, outOfPocketMax)
   totalAnnualCost = estimatedMonthlyPremium * 12 + medicalOutOfPocket
@@ -645,6 +708,25 @@ function AnalysisConfigForm({
         <CardContent className="space-y-6">
           {currentStep === 'config' && (
             <>
+              {/* Network Type Selection */}
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-sm mb-1">Network Type</h4>
+                    <p className="text-xs text-gray-600">Choose whether to analyze costs for in-network or out-of-network providers</p>
+                  </div>
+                  <Select value={networkType} onValueChange={(value: 'in-network' | 'out-of-network') => setNetworkType(value)}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in-network">In-Network</SelectItem>
+                      <SelectItem value="out-of-network">Out-of-Network</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Configuration inputs */}
           <div className="space-y-4">
             <div className="flex justify-center">
@@ -790,7 +872,7 @@ function AnalysisConfigForm({
                             <div className="mb-2">
                               <div className="text-gray-600 mb-1">Conditions:</div>
                               <div className="flex flex-wrap gap-1">
-                                {member.conditions.map((condition, condIndex) => (
+                                {member.conditions.map((condition: string, condIndex: number) => (
                                   <Badge key={condIndex} variant="outline" className="text-xs">
                                     {condition}
                                   </Badge>
@@ -803,7 +885,7 @@ function AnalysisConfigForm({
                             <div className="mb-2">
                               <div className="text-gray-600 mb-1">Medications:</div>
                               <div className="flex flex-wrap gap-1">
-                                {member.medications.map((med, medIndex) => (
+                                {member.medications.map((med: string, medIndex: number) => (
                                   <Badge key={medIndex} variant="outline" className="text-xs">
                                     {med}
                                   </Badge>
@@ -815,7 +897,7 @@ function AnalysisConfigForm({
                           {member.plannedVisits.length > 0 && (
                             <div>
                               <div className="text-gray-600 mb-1">Planned Visits:</div>
-                              {member.plannedVisits.map((visit, visitIndex) => (
+                              {member.plannedVisits.map((visit: any, visitIndex: number) => (
                                 <div key={visitIndex} className="flex justify-between ml-2 text-xs">
                                   <span>{visit.name}:</span>
                                   <span className="font-medium">{visit.frequency}</span>
@@ -943,6 +1025,11 @@ function AnalysisConfigForm({
                     <p className="text-green-700 text-sm">
                       Your personalized cost analysis has been calculated based on your health profile and the pricing data we retrieved.
                     </p>
+                    <div className="mt-3">
+                      <Badge variant={networkType === 'in-network' ? 'default' : 'secondary'} className="text-sm">
+                        {networkType === 'in-network' ? '🏥 In-Network' : '🌐 Out-of-Network'} Provider Costs
+                      </Badge>
+                    </div>
                   </div>
 
                   <div className="grid gap-6">
@@ -975,7 +1062,7 @@ function AnalysisConfigForm({
                               </div>
                             </div>
                           </CardHeader>
-                          <CardContent className="p-6">
+                          <CardContent className="p-2">
                             <div className="space-y-4">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {analysis.memberBreakdowns.map((member, memberIndex) => (
@@ -983,6 +1070,70 @@ function AnalysisConfigForm({
                                     <h4 className="font-medium mb-3">
                                       {healthProfile[memberIndex]?.name || `Member ${memberIndex + 1}`}
                                     </h4>
+                                    
+                                    {/* Show medication tier costs if member has medications */}
+                                    {member.medications.count > 0 && member.medicationDetails && member.medicationDetails.length > 0 && (
+                                      <div className="mb-3 p-3 bg-purple-100 rounded-lg">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Pill className="w-4 h-4 text-purple-700" />
+                                          <span className="text-sm font-medium text-purple-900">Medication Coverage</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                          {(() => {
+                                            const genericService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('generic'))
+                                            const brandService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('brand') && !s.name.toLowerCase().includes('non-preferred'))
+                                            const nonPreferredService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('non-preferred'))
+                                            const specialtyService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('specialty'))
+                                            
+                                            return (
+                                              <>
+                                                {genericService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Generic:</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? genericService.what_you_will_pay.network_provider 
+                                                        : genericService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                                {brandService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Preferred:</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? brandService.what_you_will_pay.network_provider 
+                                                        : brandService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                                {nonPreferredService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Non-Pref:</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? nonPreferredService.what_you_will_pay.network_provider 
+                                                        : nonPreferredService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                                {specialtyService && (
+                                                  <div className="flex justify-between">
+                                                    <span className="text-purple-700">Specialty:</span>
+                                                    <span className="font-medium text-purple-900">
+                                                      {networkType === 'in-network' 
+                                                        ? specialtyService.what_you_will_pay.network_provider 
+                                                        : specialtyService.what_you_will_pay.out_of_network_provider}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </>
+                                            )
+                                          })()}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
                                     <div className="space-y-2">
                                       {member.primaryCareVisits.count > 0 && (
                                         <div className="flex justify-between text-sm">
@@ -997,9 +1148,29 @@ function AnalysisConfigForm({
                                         </div>
                                       )}
                                       {member.medications.count > 0 && (
-                                        <div className="flex justify-between text-sm">
-                                          <span>Medications ({member.medications.count} fills per year)</span>
-                                          <span className="font-medium">${member.medications.total}</span>
+                                        <div className="space-y-1">
+                                          <div className="flex justify-between text-sm font-medium">
+                                            <span>Medications ({member.medications.count} fills per year)</span>
+                                            <span>${member.medications.total}</span>
+                                          </div>
+                                          {member.medicationDetails && member.medicationDetails.length > 0 && (
+                                            <div className="ml-4 space-y-2 mt-2">
+                                              {member.medicationDetails.map((med: any, medIndex: number) => (
+                                                <div key={medIndex} className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                    <Pill className="w-3 h-3 text-gray-400" />
+                                                    <span className="text-xs text-gray-700">{med.name}</span>
+                                                    <Badge 
+                                                      className={`text-xs px-1.5 py-0 h-5 ${getCategoryColor(med.category)}`}
+                                                    >
+                                                      {med.categoryDisplay}
+                                                    </Badge>
+                                                  </div>
+                                                  <span className="text-xs font-medium">${med.annualCost}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                       {member.diagnosticTests.count > 0 && (
@@ -1098,10 +1269,12 @@ function AnalysisConfigForm({
 
 function PolicyComparisonTable({ 
   policiesWithResults,
-  analysisResults 
+  analysisResults,
+  networkType = 'in-network'
 }: { 
   policiesWithResults: Array<{ policy: SBCData, result: any }>
   analysisResults?: PolicyAnalysis[]
+  networkType?: 'in-network' | 'out-of-network'
 }) {
   const [selectedModal, setSelectedModal] = useState<SBCData | null>(null)
 
@@ -1126,11 +1299,13 @@ function PolicyComparisonTable({
               {policiesWithResults.map(({ policy, result }, index) => (
                 <th key={index} className="text-left p-4 font-medium text-gray-900 min-w-64">
                   <div className="space-y-2 relative">
-                    <div className="font-semibold line-clamp-1">{policy.plan_summary.plan_name}</div>
-                    <div className="flex flex-col gap-1">
-                      <Badge variant="outline" className="w-fit text-xs">{policy.plan_summary.issuer_name} &bull; {policy.plan_summary.plan_type}</Badge>
-                      <Badge variant="secondary" className="w-fit text-xs">{policy.plan_summary.coverage_for}</Badge>
+                    <div className="flex flex-row xl:flex-col items-start  gap-1">
+                      <div className="text-sm font-semibold line-clamp-1 max-w-48" title={policy.plan_summary.plan_name}>{policy.plan_summary.plan_name}</div>
+                      <Badge variant="outline" className="hidden xl:flex w-fit text-xs">{policy.plan_summary.issuer_name} &bull; {policy.plan_summary.plan_type}</Badge>
                     </div>
+                    {/* <div className="flex flex-col gap-1">
+                      <Badge variant="secondary" className="w-fit text-xs">{policy.plan_summary.coverage_for}</Badge>
+                    </div> */}
                     <div className="absolute right-0 -top-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -1165,31 +1340,31 @@ function PolicyComparisonTable({
           </thead>
           <tbody>
             <tr className="border-t">
-              <td className="p-4 text-smfont-medium text-gray-700 bg-gray-50">Individual Deductible</td>
+              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Individual Deductible</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.individual.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.in_network.individual.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
-              <td className="p-4 text-sm font-medium text-gray-700 bg-gray-50">Family Deductible</td>
+              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Family Deductible</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.family.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.overall_deductible.in_network.family.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
-              <td className="p-4 text-sm font-medium text-gray-700 bg-gray-50">Individual Out-of-Pocket Max</td>
+              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Individual Out-of-Pocket Max</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.individual.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
-              <td className="p-4 text-sm font-medium text-gray-700 bg-gray-50">Family Out-of-Pocket Max</td>
+              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Family Out-of-Pocket Max</td>
               {policiesWithResults.map(({ policy }, index) => (
-                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.family.toLocaleString()}</td>
+                <td key={index} className="p-4 text-sm font-medium">${policy.important_questions.out_of_pocket_limit_for_plan.in_network.family.toLocaleString()}</td>
               ))}
             </tr>
             <tr className="border-t">
-              <td className="p-4 text-sm font-medium text-gray-700 bg-gray-50">In-Network Provider Savings</td>
+              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">In-Network Provider Savings</td>
               {policiesWithResults.map(({ policy }, index) => (
                 <td key={index} className="p-4 text-sm">
                   {policy.important_questions.network_provider_savings.lower_costs ? "Yes" : "No"}
@@ -1197,7 +1372,7 @@ function PolicyComparisonTable({
               ))}
             </tr>
             <tr className="border-t">
-              <td className="p-4 text-sm font-medium text-gray-700 bg-gray-50">Referral Required for Specialist</td>
+              <td className="p-2 text-sm font-medium text-gray-700 bg-gray-50">Referral Required for Specialist</td>
               {policiesWithResults.map(({ policy }, index) => (
                 <td key={index} className="p-4 text-sm">
                   {policy.important_questions.need_referral_for_specialist_care.required ? "Yes" : "No"}
@@ -1209,9 +1384,14 @@ function PolicyComparisonTable({
             {analysisResults && analysisResults.length > 0 && (
               <>
                 <tr className="border-t-2 border-gray-300">
-                  <td className="p-4 font-semibold text-gray-900 bg-blue-50 text-lg" colSpan={policiesWithResults.length + 1}>
+                  <td className="p-2 font-semibold text-gray-900 bg-blue-50 text-lg" colSpan={policiesWithResults.length + 1}>
                     <div>
-                      <div>Personalized Analysis</div>
+                      <div className="flex items-center gap-3">
+                        <span>Personalized Analysis</span>
+                        <Badge variant={networkType === 'in-network' ? 'default' : 'secondary'} className="text-xs font-normal">
+                          {networkType === 'in-network' ? 'In-Network' : 'Out-of-Network'}
+                        </Badge>
+                      </div>
                       <div className="text-sm font-normal text-gray-600 mt-1">
                         Out-of-pocket costs only • Premium costs not included
                       </div>
@@ -1219,11 +1399,11 @@ function PolicyComparisonTable({
                   </td>
                 </tr>
                 <tr className="border-t">
-                  <td className="p-4 font-medium text-gray-700 bg-gray-50">Relative Grade</td>
+                  <td className="p-2 font-medium text-gray-700 bg-gray-50">Relative Grade</td>
                   {policiesWithResults.map(({ policy }, index) => {
                     const analysis = analysisResults.find(a => a.policyName === policy.plan_summary.plan_name)
                     return (
-                      <td key={index} className="p-4">
+                      <td key={index} className="p-2">
                         {analysis ? (
                           <Badge className={`text-lg font-bold px-3 py-1 ${getGradeColor(analysis.grade)}`}>
                             {analysis.grade}
@@ -1236,7 +1416,7 @@ function PolicyComparisonTable({
                   })}
                 </tr>
                 <tr className="border-t">
-                  <td className="p-4 font-medium text-gray-700 bg-gray-50">Estimated Annual Out-of-Pocket</td>
+                  <td className="p-2 font-medium text-gray-700 bg-gray-50">Estimated Annual Out-of-Pocket</td>
                   {policiesWithResults.map(({ policy }, index) => {
                     const analysis = analysisResults.find(a => a.policyName === policy.plan_summary.plan_name)
                     return (
@@ -1267,6 +1447,30 @@ function PolicyComparisonTable({
                                   {memberIndex === 0 ? 'Primary Member' : `Member ${memberIndex + 1}`}
                                 </div>
                                 
+                                {/* Show medication tier costs if member has medications */}
+                                {member.medications.count > 0 && member.medicationDetails && member.medicationDetails.length > 0 && (
+                                  <div className="mb-2 p-2 bg-purple-50 rounded text-xs">
+                                    <div className="font-medium text-purple-900 mb-1">Medication Tier Costs:</div>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-purple-800">
+                                      {(() => {
+                                        const genericService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('generic'))
+                                        const brandService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('brand') && !s.name.toLowerCase().includes('non-preferred'))
+                                        const nonPreferredService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('non-preferred'))
+                                        const specialtyService = policy.services_you_may_need.find(s => s.name.toLowerCase().includes('specialty'))
+                                        
+                                        return (
+                                          <>
+                                            {genericService && <div>Generic: {networkType === 'in-network' ? genericService.what_you_will_pay.network_provider : genericService.what_you_will_pay.out_of_network_provider}</div>}
+                                            {brandService && <div>Brand: {networkType === 'in-network' ? brandService.what_you_will_pay.network_provider : brandService.what_you_will_pay.out_of_network_provider}</div>}
+                                            {nonPreferredService && <div>Non-Pref: {networkType === 'in-network' ? nonPreferredService.what_you_will_pay.network_provider : nonPreferredService.what_you_will_pay.out_of_network_provider}</div>}
+                                            {specialtyService && <div>Specialty: {networkType === 'in-network' ? specialtyService.what_you_will_pay.network_provider : specialtyService.what_you_will_pay.out_of_network_provider}</div>}
+                                          </>
+                                        )
+                                      })()}
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 <div className="space-y-1">
                                   {member.primaryCareVisits.count > 0 && (
                                     <div className="flex justify-between">
@@ -1283,9 +1487,27 @@ function PolicyComparisonTable({
                                   )}
                                   
                                   {member.medications.count > 0 && (
-                                    <div className="flex justify-between">
-                                      <span>Medications ({member.medications.count}× ${member.medications.costPerFill})</span>
-                                      <span className="font-medium">${member.medications.total.toLocaleString()}</span>
+                                    <div className="space-y-1">
+                                      <div className="flex justify-between font-medium">
+                                        <span>Medications ({member.medications.count} fills)</span>
+                                        <span>${member.medications.total.toLocaleString()}</span>
+                                      </div>
+                                      {member.medicationDetails && member.medicationDetails.length > 0 && (
+                                        <div className="ml-2 space-y-1 text-xs">
+                                          {member.medicationDetails.map((med: any, medIndex: number) => (
+                                            <div key={medIndex} className="flex items-center justify-between">
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-gray-600">•</span>
+                                                <span>{med.name}</span>
+                                                <Badge className={`text-xs px-1 py-0 h-4 ${getCategoryColor(med.category)}`}>
+                                                  {med.categoryDisplay}
+                                                </Badge>
+                                              </div>
+                                              <span>${med.annualCost}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                   
@@ -1793,6 +2015,8 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
   const [analysisResults, setAnalysisResults] = useState<PolicyAnalysis[] | EnhancedPolicyAnalysis[]>([])
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isEnhancedAnalysis, setIsEnhancedAnalysis] = useState(false)
+  const [showSmartAnalysis, setShowSmartAnalysis] = useState(true)
+  const [unifiedAnalysisResults, setUnifiedAnalysisResults] = useState<any>(null)
   const { members } = useHealthProfileStore()
 
   const successfulResults = results.results.filter(r => r.success && r.data)
@@ -1823,6 +2047,12 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
     }
   }
 
+  const handleUnifiedAnalysisComplete = (results: any) => {
+    setUnifiedAnalysisResults(results)
+    setAnalysisResults(results.analysis.policies || [])
+    setShowSmartAnalysis(false)
+  }
+
   if (successfulPolicies.length === 0) {
     return (
       <div className="text-center py-12">
@@ -1840,6 +2070,84 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
 
   return (
     <div className="p-6">
+      {/* Smart Analysis Section */}
+      {/* {showSmartAnalysis && members.length > 0 && (
+        <div className="mb-6">
+          <SmartAnalysisButton
+            sbcResults={results}
+            members={members}
+            location="United States" // TODO: Get actual location from user
+            onComplete={handleUnifiedAnalysisComplete}
+          />
+        </div>
+      )} */}
+
+      {/* Display unified analysis results */}
+      {unifiedAnalysisResults && (
+        <Card className="mb-6 border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-green-600" />
+              Best Match: {unifiedAnalysisResults.bestPolicy.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-sm text-gray-600">Estimated Annual Cost</div>
+                <div className="text-2xl font-bold text-green-600">
+                  ${unifiedAnalysisResults.bestPolicy.estimatedAnnualCost.toLocaleString()}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-600">Grade</div>
+                <div className="text-2xl font-bold">
+                  <Badge className="text-lg px-3 py-1">{unifiedAnalysisResults.bestPolicy.grade}</Badge>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-600">Potential Savings</div>
+                <div className="text-2xl font-bold text-blue-600">
+                  ${unifiedAnalysisResults.bestPolicy.potentialSavings.toLocaleString()}/year
+                </div>
+              </div>
+            </div>
+            
+            {/* Key Insights */}
+            {unifiedAnalysisResults.insights.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2">Key Insights</h4>
+                <div className="space-y-1">
+                  {unifiedAnalysisResults.insights.map((insight: any, index: number) => (
+                    <div key={index} className="flex items-start gap-2 text-sm">
+                      <span className={`w-2 h-2 rounded-full mt-1 ${
+                        insight.impact === 'high' ? 'bg-red-500' :
+                        insight.impact === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                      }`} />
+                      <div>
+                        <span className="font-medium">{insight.condition}:</span> {insight.insight}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Recommendations */}
+            {unifiedAnalysisResults.recommendations.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold mb-2">Recommendations</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
+                  {unifiedAnalysisResults.recommendations.map((rec: string, index: number) => (
+                    <li key={index}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="summary" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="summary">Summary & Analysis</TabsTrigger>
@@ -1850,15 +2158,58 @@ export default function PolicyComparison({ results }: PolicyComparisonProps) {
           <PolicyComparisonTable 
             policiesWithResults={policiesWithResults} 
             analysisResults={analysisResults}
+            networkType={networkType}
           />
           
-          <AnalysisConfigForm 
-            onAnalyze={handleAnalyze}
-            healthProfile={members}
+          {/* Policy Analysis Component */}
+          <PolicyAnalysisComponent
             policies={successfulPolicies}
-            isAnalyzing={isAnalyzing}
-            analysisResults={analysisResults}
-            results={results}
+            healthProfile={members}
+            onAnalysisComplete={(results: PolicyAnalysisResult[]) => {
+              // Convert PolicyAnalysisResult[] to PolicyAnalysis[] for compatibility
+              const convertedResults = results.map((result: PolicyAnalysisResult) => ({
+                policyName: result.policyName,
+                grade: result.grade,
+                score: result.grade === 'A' ? 90 : result.grade === 'B' ? 80 : result.grade === 'C' ? 70 : result.grade === 'D' ? 60 : 50,
+                estimatedAnnualCost: result.estimatedAnnualCost,
+                memberBreakdowns: result.memberBreakdowns.map(member => ({
+                  memberIndex: member.memberIndex,
+                  primaryCareVisits: { 
+                    count: member.costs.find(c => c.service === 'Primary Care')?.frequency || 0,
+                    costPerVisit: member.costs.find(c => c.service === 'Primary Care')?.unitCost || 0,
+                    total: member.costs.find(c => c.service === 'Primary Care')?.totalCost || 0
+                  },
+                  specialistVisits: {
+                    count: member.costs.find(c => c.service === 'Specialist')?.frequency || 0,
+                    costPerVisit: member.costs.find(c => c.service === 'Specialist')?.unitCost || 0,
+                    total: member.costs.find(c => c.service === 'Specialist')?.totalCost || 0
+                  },
+                  medications: {
+                    count: member.costs.find(c => c.service === 'Medications')?.frequency || 0,
+                    costPerFill: member.costs.find(c => c.service === 'Medications')?.unitCost || 0,
+                    total: member.costs.find(c => c.service === 'Medications')?.totalCost || 0
+                  },
+                  diagnosticTests: {
+                    count: member.costs.find(c => c.service === 'Diagnostic Tests')?.frequency || 0,
+                    costPerTest: member.costs.find(c => c.service === 'Diagnostic Tests')?.unitCost || 0,
+                    total: member.costs.find(c => c.service === 'Diagnostic Tests')?.totalCost || 0
+                  },
+                  plannedVisits: member.costs.filter(c => !['Primary Care', 'Specialist', 'Medications', 'Diagnostic Tests'].includes(c.service)).map(cost => ({
+                    name: cost.service,
+                    frequency: cost.frequency,
+                    costPerVisit: cost.unitCost,
+                    total: cost.totalCost
+                  })),
+                  memberTotal: member.memberTotal
+                })),
+                breakdown: {
+                  ...result.breakdown,
+                  premiums: 0, // Not included in our analysis
+                  outOfPocketMax: 0 // Will be calculated elsewhere
+                }
+              }))
+              setAnalysisResults(convertedResults)
+            }}
           />
         </TabsContent>
         

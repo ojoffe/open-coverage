@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { AccessibleBadge } from "@/components/ui/accessible-badge"
 import { Check, ChevronsUpDown, X, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCompletion } from "ai/react"
+import type { HealthSuggestion, HealthSuggestionsResponse } from "@/app/api/health-suggestions/route"
 
 export interface AIAutocompleteOption {
   value: string
@@ -29,6 +29,11 @@ interface AIAutocompleteProps {
   customLabel?: string
   searchEndpoint?: string
   searchType: "conditions" | "medications" | "allergies" | "services"
+  expectedOutput?: {
+    maxSuggestions?: number
+    requireCategory?: boolean
+    requireDetails?: boolean
+  }
 }
 
 export function AIAutocomplete({
@@ -44,11 +49,13 @@ export function AIAutocomplete({
   customLabel = "Add custom",
   searchEndpoint = "/api/health-suggestions",
   searchType,
+  expectedOutput = { maxSuggestions: 10, requireCategory: false, requireDetails: false },
 }: AIAutocompleteProps) {
   const [open, setOpen] = React.useState(false)
   const [searchValue, setSearchValue] = React.useState("")
   const [aiSuggestions, setAiSuggestions] = React.useState<AIAutocompleteOption[]>([])
   const [isSearching, setIsSearching] = React.useState(false)
+  const [justSelected, setJustSelected] = React.useState(false)
   const searchDebounceRef = React.useRef<NodeJS.Timeout>()
 
   const selectedOptions = React.useMemo(() => {
@@ -59,19 +66,21 @@ export function AIAutocomplete({
     })
   }, [options, aiSuggestions, value])
 
-  // AI-powered search
+  // AI-powered search with structured output
   React.useEffect(() => {
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current)
     }
 
-    if (!searchValue || searchValue.length < 2) {
+    if (!searchValue || searchValue.length < 2 || justSelected) {
       setAiSuggestions([])
       return
     }
 
     searchDebounceRef.current = setTimeout(async () => {
       setIsSearching(true)
+      console.log(`AIAutocomplete: Searching for ${searchType} with query:`, searchValue)
+      
       try {
         const response = await fetch(searchEndpoint, {
           method: "POST",
@@ -80,15 +89,38 @@ export function AIAutocomplete({
             query: searchValue,
             type: searchType,
             existingValues: value,
+            maxSuggestions: expectedOutput.maxSuggestions,
           }),
         })
         
         if (response.ok) {
-          const data = await response.json()
-          setAiSuggestions(data.suggestions || [])
+          const data: HealthSuggestionsResponse = await response.json()
+          console.log(`AIAutocomplete: Received ${data.suggestions?.length || 0} AI suggestions:`, data.suggestions)
+          
+          // Validate and convert suggestions to AIAutocompleteOption format
+          const validSuggestions = data.suggestions
+            .filter((suggestion: HealthSuggestion) => {
+              // Filter based on expected output requirements
+              if (expectedOutput.requireCategory && !suggestion.category) return false
+              if (expectedOutput.requireDetails && !suggestion.details) return false
+              return true
+            })
+            .map((suggestion: HealthSuggestion): AIAutocompleteOption => ({
+              value: suggestion.value,
+              label: suggestion.label,
+              category: suggestion.category,
+              details: suggestion.details,
+            }))
+          
+          console.log(`AIAutocomplete: Processed ${validSuggestions.length} valid suggestions:`, validSuggestions)
+          setAiSuggestions(validSuggestions)
+        } else {
+          console.error("AI search failed:", response.status, response.statusText)
+          setAiSuggestions([])
         }
       } catch (error) {
         console.error("AI search error:", error)
+        setAiSuggestions([])
       } finally {
         setIsSearching(false)
       }
@@ -99,29 +131,52 @@ export function AIAutocomplete({
         clearTimeout(searchDebounceRef.current)
       }
     }
-  }, [searchValue, searchType, searchEndpoint, value])
+  }, [searchValue, searchType, searchEndpoint, value, expectedOutput, justSelected])
 
   const handleSelect = (optionValue: string) => {
+    console.log("AIAutocomplete: Selecting option:", optionValue, "Current values:", value)
+    
+    // Set flag to prevent immediate search after selection
+    setJustSelected(true)
+    
     if (multiple) {
       if (value.includes(optionValue)) {
         onChange(value.filter((v) => v !== optionValue))
       } else {
         onChange([...value, optionValue])
       }
+      // Clear search and AI suggestions after selection in multiple mode
+      setSearchValue("")
+      setAiSuggestions([])
     } else {
       onChange([optionValue])
+      setSearchValue("")
+      setAiSuggestions([])
       setOpen(false)
     }
+    
+    // Clear the flag after a short delay
+    setTimeout(() => setJustSelected(false), 100)
   }
 
   const handleRemove = (optionValue: string) => {
+    console.log("AIAutocomplete: Removing option:", optionValue)
     onChange(value.filter((v) => v !== optionValue))
   }
 
   const handleAddCustom = () => {
+    console.log("AIAutocomplete: Adding custom option:", searchValue.trim())
+    
     if (searchValue.trim() && !value.includes(searchValue.trim())) {
+      // Set flag to prevent immediate search after adding custom option
+      setJustSelected(true)
+      
       onChange([...value, searchValue.trim()])
       setSearchValue("")
+      setAiSuggestions([])
+      
+      // Clear the flag after a short delay
+      setTimeout(() => setJustSelected(false), 100)
     }
   }
 
@@ -134,6 +189,12 @@ export function AIAutocomplete({
       if (!combined.some(opt => opt.value === suggestion.value)) {
         combined.push(suggestion)
       }
+    })
+    
+    console.log(`AIAutocomplete: Combined options (${combined.length} total):`, {
+      static: options.length,
+      ai: aiSuggestions.length,
+      combined: combined.length
     })
     
     return combined
@@ -151,6 +212,7 @@ export function AIAutocomplete({
       groups[category].push(option)
     })
     
+    console.log(`AIAutocomplete: Grouped options:`, Object.keys(groups).map(cat => `${cat}: ${groups[cat].length}`))
     return groups
   }, [allOptions])
 
@@ -171,6 +233,7 @@ export function AIAutocomplete({
       }
     })
     
+    console.log(`AIAutocomplete: Filtered groups for "${searchValue}":`, Object.keys(filtered).map(cat => `${cat}: ${filtered[cat].length}`))
     return filtered
   }, [groupedOptions, searchValue])
 
@@ -203,7 +266,7 @@ export function AIAutocomplete({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-full p-0" align="start">
-          <Command>
+          <Command shouldFilter={false}>
             <div className="relative">
               <CommandInput 
                 placeholder={searchPlaceholder} 

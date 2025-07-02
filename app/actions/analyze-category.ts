@@ -86,12 +86,12 @@ export async function analyzeCareCategory(input: CategoryAnalysisInput): Promise
       planType: policy.plan_summary.plan_type,
       issuer: policy.plan_summary.issuer_name,
       deductible: {
-        individual: policy.important_questions.overall_deductible.individual,
-        family: policy.important_questions.overall_deductible.family
+        individual: policy.important_questions.overall_deductible.in_network.individual,
+        family: policy.important_questions.overall_deductible.in_network.family
       },
       outOfPocketMax: {
-        individual: policy.important_questions.out_of_pocket_limit_for_plan.individual,
-        family: policy.important_questions.out_of_pocket_limit_for_plan.family
+        individual: policy.important_questions.out_of_pocket_limit_for_plan.in_network.individual,
+        family: policy.important_questions.out_of_pocket_limit_for_plan.in_network.family
       },
       needsReferral: policy.important_questions.need_referral_for_specialist_care.required,
       services: policy.services_you_may_need.map(service => ({

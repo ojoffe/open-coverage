@@ -1,15 +1,14 @@
 "use server"
 
-import { generateObject } from "ai"
+import { generateObjectWithAIRetry } from "@/lib/ai-retry"
+import { sbcSchema, type ProcessingResult, type ProcessSBCResponse } from "@/lib/sbc-schema"
 import { google } from "@ai-sdk/google"
 import { put } from '@vercel/blob'
 import { kv } from '@vercel/kv'
-import { sbcSchema, type ProcessingResult, type ProcessSBCResponse } from "@/lib/sbc-schema"
-import { generateObjectWithAIRetry } from "@/lib/ai-retry"
 
 const GEMINI_MODEL = google("gemini-2.0-flash-exp")
 
-async function processSingleSBC(file: File): Promise<ProcessingResult> {
+export async function processSingleSBC(file: File): Promise<ProcessingResult> {
   try {
     // Upload PDF to Vercel Blob storage
     const blob = await put(file.name, file, {
