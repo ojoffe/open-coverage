@@ -62,32 +62,80 @@ We believe that:
 
 ```
 app/
-├── api/chat/           # AI-powered chat endpoint
+├── actions/            # Server actions for AI operations
+├── analysis/           # Policy analysis pages
 ├── analyze-compare/    # Policy comparison interface
+├── analyze-compare-v2/ # Enhanced comparison interface
+├── analyze-policy/     # Single policy analysis
+├── api/                # API endpoints
+│   ├── analyze-health-profile/
+│   ├── chat/          # AI-powered chat endpoint
+│   ├── health-suggestions/
+│   ├── search-treatment-cost/
+│   └── treatment-costs/
+├── compare-policies/   # Policy comparison tools
+├── cost-analysis/      # Healthcare cost analysis
+├── find-providers/     # Provider discovery
 ├── health-profile/     # Family health management
 ├── assistant.tsx       # AI chat component
+├── error.tsx          # Error handling pages
+├── global-error.tsx   # Global error boundary
+├── layout.tsx         # Root layout
+├── not-found.tsx      # 404 page
 └── page.tsx           # Homepage
 
 components/
-├── app-sidebar.tsx    # Navigation
+├── app-sidebar.tsx    # Navigation sidebar
 ├── assistant-ui/      # Chat interface components
 ├── error-boundaries/  # Error handling components
-└── ui/               # Reusable UI components
+├── health-profile/    # Health profile components
+├── ui/               # Reusable UI components (shadcn)
+├── policy-*.tsx      # Policy-specific components
+├── cost-analysis-summary.tsx
+├── healthcare-information-modal.tsx
+├── premium-input-modal.tsx
+├── profile-completeness.tsx
+├── risk-assessment-display.tsx
+├── treatment-cost-display.tsx
+└── utilization-display.tsx
 
 lib/
 ├── services/              # Business logic and AI operations
-├── health-profile-store.ts  # Health data management
-├── sbc-schema.ts           # Insurance document schemas
-└── pdf-utils.ts            # Document processing
+│   ├── insurance-ai-service.ts
+│   ├── policy-comparison-service.ts
+│   └── policy-service.ts
+├── hooks/                 # Utility hooks
+│   ├── use-health-ai.ts
+│   ├── use-screen-reader.tsx
+│   └── use-treatment-costs.ts
+├── analysis-store.ts      # Analysis state management
+├── enhanced-health-profile-store.ts
+├── health-profile-store.ts
+├── health-risk-assessment.ts
+├── insurance-calculator.ts
+├── medication-cost-calculator.ts
+├── pdf-utils.ts           # Document processing
+├── sbc-schema.ts          # Insurance document schemas
+├── treatment-cost-service.ts
+├── unified-analysis-service.ts
+└── utilization-engine.ts
 
 hooks/
 ├── use-category-analysis.ts    # AI category management
+├── use-comparison-history.ts   # Comparison history
+├── use-healthcare-information.ts
+├── use-insurance-settings.ts   # Centralized settings
+├── use-mobile.ts              # Mobile detection
 ├── use-situation-suggestions.ts # Healthcare suggestions
-└── use-insurance-settings.ts   # Centralized settings
+└── use-toast.ts               # Toast notifications
 
 types/
 ├── schemas.ts         # Consolidated Zod schemas
 └── insurance.ts       # Type definitions
+
+policy-templates/      # Sample policy templates
+
+__tests__/            # Test files
 ```
 
 ### Architecture Overview
@@ -251,25 +299,5 @@ This project includes comprehensive [Cursor IDE](https://cursor.sh/) rules for e
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [v0.dev](https://v0.dev) for rapid prototyping
-- UI components from [shadcn/ui](https://ui.shadcn.com) & [magicui](https://ui.magicui.com)
-- AI chat interface from [@assistant-ui/react](https://github.com/assistant-ui/assistant-ui)
-- Icons from [Lucide React](https://lucide.dev)
-- Hosted on [Vercel](https://vercel.com)
-- Fast runtime with [Bun](https://bun.sh)
-
-## 📞 Connect With Us
-
-- 🌐 **Website**: [open-coverage.com](https://open-coverage.com)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-username/open-coverage/discussions)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/your-username/open-coverage/issues)
-- 📧 **Email**: hello@open-coverage.com
-
----
-
-**Made with ❤️ by the Open Coverage community**
 
 *Together, we're making healthcare decisions more transparent, accessible, and affordable for everyone.*
