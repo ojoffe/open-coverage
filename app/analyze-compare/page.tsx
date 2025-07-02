@@ -378,7 +378,7 @@ function AnalyzeCompareContent() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbPage>Analyze & Compare Policies</BreadcrumbPage>
+                <BreadcrumbPage>Compare Policies</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -419,7 +419,7 @@ function AnalyzeCompareContent() {
           <div className="flex-1 bg-gray-50">
             <div className="max-w-6xl mx-auto px-4 py-12">
               <div className="text-center mb-12">
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">Analyze & Compare Health Insurance Policies</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">Compare Health Insurance Policies</h1>
                 <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                   Upload your SBC documents to compare coverage options and benefits. You can upload up to {MAX_POLICIES}{" "}
                   policies.

@@ -1,11 +1,11 @@
 "use client"
 
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FileText, Users, ArrowRight, Shield, Upload, BarChart3, Stethoscope } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
+import { ArrowRight, FileText, Shield, Users } from "lucide-react"
 import Link from "next/link"
 
 export default function HomePage() {
@@ -33,47 +33,14 @@ export default function HomePage() {
           </div>
 
           {/* How It Works Section */}
-          <div className="mb-16">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">How It Works</h2>
-            <div className="max-w-3xl mx-auto space-y-4">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Users className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">1. Set Up Health Profile</h3>
-                  <p className="text-sm text-gray-600">Configure your family's health information. Data is stored locally for privacy.</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Upload className="w-4 h-4 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">2. Upload SBC Documents</h3>
-                  <p className="text-sm text-gray-600">Upload insurance policies and let AI extract key information.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <BarChart3 className="w-4 h-4 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">3. Compare & Analyze</h3>
-                  <p className="text-sm text-gray-600">Get personalized cost projections and side-by-side comparisons.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          
 
           {/* Tools Section */}
-          <div className="text-center mb-8">
+          {/* <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Tools</h2>
-          </div>
+          </div> */}
 
-          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -101,17 +68,41 @@ export default function HomePage() {
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  Analyze & Compare
+                  <Shield className="w-5 h-5 text-purple-600" />
+                  Analyze Policy
                 </CardTitle>
-                <CardDescription>Upload and compare multiple health insurance policies side by side</CardDescription>
+                <CardDescription>Get detailed analysis of a single health insurance policy</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• Upload one SBC document</li>
+                  <li>• Detailed coverage breakdown</li>
+                  <li>• Personalized cost estimates</li>
+                  <li>• Coverage insights</li>
+                </ul>
+                <Button asChild className="w-full">
+                  <Link href="/analyze-policy">
+                    Get Started
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  Compare Policies
+                </CardTitle>
+                <CardDescription>Compare multiple health insurance policies side by side</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <ul className="text-sm text-gray-600 space-y-1">
                   <li>• Upload up to 8 SBC documents</li>
-                  <li>• AI-powered policy analysis</li>
-                  <li>• Side-by-side comparison tables</li>
-                  <li>• Personalized cost projections</li>
+                  <li>• Side-by-side comparison</li>
+                  <li>• Cost analysis</li>
+                  <li>• Best match recommendations</li>
                 </ul>
                 <Button asChild className="w-full">
                   <Link href="/analyze-compare">
@@ -122,7 +113,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-shadow">
+            {/* <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Stethoscope className="w-5 h-5 text-green-600" />
@@ -144,8 +135,9 @@ export default function HomePage() {
                   </Link>
                 </Button>
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
+          
           {/* Disclaimers */}
           <div className="space-y-4 mt-6">
             {/* Privacy Notice */}

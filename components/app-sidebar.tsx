@@ -52,7 +52,13 @@ const data = {
           isActive: false,
         },
         {
-          title: "Analyze & Compare Policies",
+          title: "Analyze Policy",
+          url: "/analyze-policy",
+          icon: FileText,
+          isActive: false,
+        },
+        {
+          title: "Compare Policies",
           url: "/analyze-compare",
           icon: Wrench,
           isActive: false,
@@ -247,7 +253,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroupLabel className="flex items-center justify-between">
               Recent Analyses
               <div className="flex items-center gap-1">
-                <Button 
+                {/* <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={() => {
@@ -285,7 +291,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   className="h-6 px-2 text-xs"
                 >
                   Debug
-                </Button>
+                </Button> */}
                 {allAnalyses.length > 0 && (
                   <Button 
                     variant="ghost" 

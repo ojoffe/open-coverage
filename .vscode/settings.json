@@ -8,7 +8,10 @@
   "editor.formatOnPaste": true,
   "emmet.showExpandedAbbreviation": "never",
   "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
+    "source.fixAll": "explicit",
     "source.fixAll.biome": "explicit",
     "source.organizeImports.biome": "explicit"
   }
 }
+
