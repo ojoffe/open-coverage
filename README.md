@@ -1,4 +1,7 @@
 # Open Coverage 🏥
+<img width="500" alt="Screenshot 2025-07-01 at 6 24 55 PM" src="https://github.com/user-attachments/assets/af224fa4-176a-487b-99d9-7505e907de82" />
+<img width="500" alt="Screenshot 2025-07-01 at 6 25 01 PM" src="https://github.com/user-attachments/assets/a3cc91a9-a397-4b05-9b4b-15fca572d7de" />
+
 
 > **Democratizing health insurance decision-making through open-source tools**
 
