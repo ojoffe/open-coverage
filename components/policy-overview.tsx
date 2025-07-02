@@ -7,7 +7,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collap
 
 export const PolicyOverview: React.FC = () => {
   const { policy } = usePolicy();
-  console.log("policy", policy);
   const [isOpen, setIsOpen] = useState(false);
 
   if (!policy) {
