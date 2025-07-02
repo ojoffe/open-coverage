@@ -269,29 +269,6 @@ This project includes comprehensive [Cursor IDE](https://cursor.sh/) rules for e
 - ✅ **Responsive Design** - Works on desktop, tablet, and mobile
 - ✅ **Privacy-First** - All data stored locally in your browser
 
-## 🗺️ Roadmap
-
-### 🎯 Phase 1: Foundation (Current)
-- [x] Core policy analysis engine
-- [x] Basic UI and document upload
-- [x] Health profile management
-- [ ] Enhanced comparison algorithms
-- [ ] Export/sharing features
-
-### 🚀 Phase 2: Advanced Features (Q1 2025)
-- [ ] Provider network analysis
-- [ ] Prescription drug coverage checker
-- [ ] HSA/FSA optimization calculator
-- [ ] Mobile app (React Native)
-- [ ] Multi-language support
-
-### 🌟 Phase 3: Community Platform (Q2 2025)
-- [ ] User-generated policy reviews
-- [ ] Community-driven policy database
-- [ ] Integration with healthcare.gov
-- [ ] Enterprise/broker tools
-- [ ] API for third-party integrations
-
 ## 🔒 Privacy & Security
 
 - **Local-first** - Your health data never leaves your device

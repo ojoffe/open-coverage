@@ -1,13 +1,12 @@
 "use client"
 
-import * as React from "react"
+import { AccessibleBadge } from "@/components/ui/accessible-badge"
+import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Button } from "@/components/ui/button"
-import { AccessibleBadge } from "@/components/ui/accessible-badge"
-import { Check, ChevronsUpDown, X, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { HealthSuggestion, HealthSuggestionsResponse } from "@/app/api/health-suggestions/route"
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
+import * as React from "react"
 
 export interface AIAutocompleteOption {
   value: string
@@ -57,6 +56,12 @@ export function AIAutocomplete({
   const [isSearching, setIsSearching] = React.useState(false)
   const [justSelected, setJustSelected] = React.useState(false)
   const searchDebounceRef = React.useRef<NodeJS.Timeout>()
+  
+  // Use ref to access current value without causing re-renders
+  const valueRef = React.useRef(value)
+  React.useEffect(() => {
+    valueRef.current = value
+  }, [value])
 
   const selectedOptions = React.useMemo(() => {
     const allOptions = [...options, ...aiSuggestions]
@@ -68,14 +73,14 @@ export function AIAutocomplete({
 
   // AI-powered search with structured output
   React.useEffect(() => {
-    if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current)
-    }
+    // if (searchDebounceRef.current) {
+    //   clearTimeout(searchDebounceRef.current)
+    // }
 
-    if (!searchValue || searchValue.length < 2 || justSelected) {
-      setAiSuggestions([])
-      return
-    }
+    // if (!searchValue || searchValue.length < 2 || justSelected) {
+    //   setAiSuggestions([])
+    //   return
+    // }
 
     searchDebounceRef.current = setTimeout(async () => {
       setIsSearching(true)
@@ -88,7 +93,7 @@ export function AIAutocomplete({
           body: JSON.stringify({
             query: searchValue,
             type: searchType,
-            existingValues: value,
+            existingValues: valueRef.current,
             maxSuggestions: expectedOutput.maxSuggestions,
           }),
         })
@@ -131,7 +136,7 @@ export function AIAutocomplete({
         clearTimeout(searchDebounceRef.current)
       }
     }
-  }, [searchValue, searchType, searchEndpoint, value, expectedOutput, justSelected])
+  }, [searchValue])
 
   const handleSelect = (optionValue: string) => {
     console.log("AIAutocomplete: Selecting option:", optionValue, "Current values:", value)
@@ -191,12 +196,6 @@ export function AIAutocomplete({
       }
     })
     
-    console.log(`AIAutocomplete: Combined options (${combined.length} total):`, {
-      static: options.length,
-      ai: aiSuggestions.length,
-      combined: combined.length
-    })
-    
     return combined
   }, [options, aiSuggestions])
 
@@ -212,7 +211,6 @@ export function AIAutocomplete({
       groups[category].push(option)
     })
     
-    console.log(`AIAutocomplete: Grouped options:`, Object.keys(groups).map(cat => `${cat}: ${groups[cat].length}`))
     return groups
   }, [allOptions])
 
@@ -233,7 +231,6 @@ export function AIAutocomplete({
       }
     })
     
-    console.log(`AIAutocomplete: Filtered groups for "${searchValue}":`, Object.keys(filtered).map(cat => `${cat}: ${filtered[cat].length}`))
     return filtered
   }, [groupedOptions, searchValue])
 

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
@@ -104,23 +104,28 @@ export default function HealthProfilePage() {
   }
 
   // Handle member removal with announcement
-  const handleRemoveMember = (memberId: string, index: number) => {
+  const handleRemoveMember = useCallback((memberId: string, index: number) => {
     removeMember(memberId)
-    announce(`Member ${index + 1} removed. Total members: ${members.length - 1}`)
-  }
+    announce(`Member ${index + 1} removed from health profile`)
+  }, [removeMember, announce])
 
   // Toggle card collapse state
-  const toggleCardCollapse = (memberId: string) => {
+  const toggleCardCollapse = useCallback((memberId: string) => {
     setCollapsedCards(prev => ({
       ...prev,
       [memberId]: !prev[memberId]
     }))
-  }
+  }, [])
 
   // Check if card is collapsed (default to open for first member, closed for others)
   const isCardCollapsed = (memberId: string, index: number) => {
     return collapsedCards[memberId] ?? (index > 0)
   }
+
+  // Memoize the updateMember callback to prevent infinite loops
+  const handleUpdateMember = useCallback((memberId: string, updates: Partial<Member>) => {
+    updateMember(memberId, updates)
+  }, [updateMember])
 
   return (
     <SidebarInset>
@@ -160,9 +165,9 @@ export default function HealthProfilePage() {
                 index={index}
                 isCollapsed={isCardCollapsed(member.id, index)}
                 canRemove={members.length > 1}
-                onUpdate={(updates) => updateMember(member.id, updates)}
-                onRemove={() => handleRemoveMember(member.id, index)}
-                onToggleCollapse={() => toggleCardCollapse(member.id)}
+                onUpdate={handleUpdateMember}
+                onRemove={handleRemoveMember}
+                onToggleCollapse={toggleCardCollapse}
               />
             ))}
           </div>

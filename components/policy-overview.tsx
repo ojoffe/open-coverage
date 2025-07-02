@@ -27,7 +27,7 @@ export const PolicyOverview: React.FC = () => {
       <CollapsibleTrigger className="w-full">
         <section className="w-full">
           <div className="text-sm flex flex-col md:flex-row gap-2 w-full bg-gray-50 rounded-lg p-3 border items-center justify-between">
-            <div className="flex-1 min-w-[100px]">
+            <div className="hidden md:block flex-1 min-w-[100px]">
               <div className="text-xs uppercase mb-1">Coverage Period</div>
               <div>
                 {coverage_period.end_date === '<UNKNOWN>' 
@@ -36,7 +36,7 @@ export const PolicyOverview: React.FC = () => {
                 }
               </div>
             </div>
-            <div className="flex-1 min-w-[100px]">
+            <div className="hidden md:block flex-1 min-w-[100px]">
               <div className="text-xs uppercase mb-1">Coverage For</div>
               <div>{coverage_for.replaceAll('_', ' ')}</div>
             </div>
@@ -44,7 +44,7 @@ export const PolicyOverview: React.FC = () => {
               <div className="text-xs uppercase mb-1">Issuer</div>
               <div>{issuer_name} ({plan_type})</div>
             </div>
-            <div className="flex items-center">
+            <div className="hidden md:flex items-center">
               {isOpen ? (
                 <ChevronUp className="h-4 w-4" />
               ) : (
