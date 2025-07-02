@@ -47,13 +47,16 @@ We believe that:
 
 ## 🛠️ Built With Modern Tech
 
-- **Next.js 14** with App Router
+- **Next.js 15** with App Router
 - **TypeScript** for type safety
 - **Tailwind CSS** + **shadcn/ui** for beautiful interfaces
-- **OpenAI GPT-4** for intelligent document analysis
+- **Anthropic Claude & Groq** for intelligent document analysis
+- **@assistant-ui/react** for AI chat interface
 - **Zustand** for state management
+- **Zod** for schema validation
 - **PDF parsing** for document processing
 - **Vercel** for deployment
+- **Bun** for fast JS runtime & package management
 
 ## 🏗️ Project Structure
 
@@ -68,37 +71,57 @@ app/
 components/
 ├── app-sidebar.tsx    # Navigation
 ├── assistant-ui/      # Chat interface components
+├── error-boundaries/  # Error handling components
 └── ui/               # Reusable UI components
 
 lib/
+├── services/              # Business logic and AI operations
 ├── health-profile-store.ts  # Health data management
 ├── sbc-schema.ts           # Insurance document schemas
 └── pdf-utils.ts            # Document processing
+
+hooks/
+├── use-category-analysis.ts    # AI category management
+├── use-situation-suggestions.ts # Healthcare suggestions
+└── use-insurance-settings.ts   # Centralized settings
+
+types/
+├── schemas.ts         # Consolidated Zod schemas
+└── insurance.ts       # Type definitions
 ```
+
+### Architecture Overview
+
+The project follows a service-layer architecture pattern:
+
+- **Service Layer First**: All AI operations go through `lib/services/`
+- **Type Safety**: Zod schemas for all validation and type generation
+- **Error Boundaries**: Graceful degradation with `AIErrorBoundary` components
+- **Custom Hooks**: Single responsibility hooks for business logic
+- **Multi-Model AI**: Fallback strategies with Anthropic Claude and Groq models
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- OpenAI API key (for AI features)
+- [Bun](https://bun.sh) (recommended) or Node.js 20+
+- API keys for Groq, Anthropic (for AI features)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/open-coverage.git
+git clone https://github.com/aaln/open-coverage.git
 cd open-coverage
 
 # Install dependencies
-npm install
+bun install
 
 # Set up environment variables
 cp .env.example .env.local
-# Add your OpenAI API key to .env.local
+# Add your API keys to .env.local (see Environment Variables section below)
 
 # Start development server
-npm run dev
+bun run dev
 ```
 
 Visit `http://localhost:3000` to see the app running.
@@ -106,11 +129,53 @@ Visit `http://localhost:3000` to see the app running.
 ### Development Commands
 
 ```bash
-npm run dev     # Start development server
-npm run build   # Build for production
-npm run start   # Start production server
-npm run lint    # Run linter
+bun run dev          # Start development server
+bun run build        # Build for production
+bun run start        # Start production server
+bun run lint         # Run linter
+bun run fetch:plans  # Fetch sample insurance plans
 ```
+
+## 🔧 Environment Variables
+
+Create a `.env.local` file in the root directory with the following variables:
+
+```bash
+# AI Model APIs
+GROQ_API_KEY=           # For Groq AI models
+ANTHROPIC_API_KEY=      # For Claude models
+
+# Document Processing
+UNSTRUCTURED_API_KEY=   # For PDF parsing
+
+# Storage & Background Jobs
+BLOB_READ_WRITE_TOKEN=  # For file storage
+TRIGGER_SECRET_KEY=     # For background jobs
+
+# CMS.gov APIs (optional - for discovery features)
+GOV_MARKETPLACE_API_KEY= # For Marketplace API
+GOV_FINDER_API_KEY=      # For Finder API
+```
+
+### Obtaining CMS.gov API Keys
+
+Note: The discovery section of the site won't work if these keys aren't available.
+
+To get API keys for the CMS Healthcare APIs:
+
+1. Visit [CMS Developer Portal](https://developer.cms.gov)
+2. Click "Sign Up" to create a CMS Enterprise Portal account
+3. For Marketplace API (GOV_MARKETPLACE_API_KEY):
+   - Navigate to "Marketplace API" section
+   - Click "Request Access"
+   - Fill out the application form 
+   - Submit and await approval
+
+4. For Finder API (GOV_FINDER_API_KEY):
+   - Navigate to "Finder API" section
+   - Click "Request Access"
+   - Complete similar application process
+   - Specify intended usage for finding private health plans
 
 ## 🤝 Contributing
 
@@ -134,6 +199,15 @@ We welcome contributions from developers, healthcare professionals, insurance ex
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
+
+### Cursor IDE Integration
+
+This project includes comprehensive [Cursor IDE](https://cursor.sh/) rules for enhanced development experience. The `.cursor/rules/` directory contains:
+
+- **Global Rules** - Core development standards and architecture patterns
+- **Server Actions** - Guidelines for Next.js server actions
+- **Self-Updating Rules** - Dynamic rule system that adapts to project changes
+- **Build Agent** - Automated build, linting, and formatting
 
 ## 📊 Current Features
 
@@ -181,9 +255,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Built with [v0.dev](https://v0.dev) for rapid prototyping
-- UI components from [shadcn/ui](https://ui.shadcn.com)
+- UI components from [shadcn/ui](https://ui.shadcn.com) & [magicui](https://ui.magicui.com)
+- AI chat interface from [@assistant-ui/react](https://github.com/assistant-ui/assistant-ui)
 - Icons from [Lucide React](https://lucide.dev)
 - Hosted on [Vercel](https://vercel.com)
+- Fast runtime with [Bun](https://bun.sh)
 
 ## 📞 Connect With Us
 
