@@ -31,6 +31,17 @@ type PredictResponse = {
 export default function UtilizationModelTestPage() {
   const [age, setAge] = useState<string>("");
   const [bmi, setBmi] = useState<string>("");
+  const [gender, setGender] = useState<string>("");
+  const [raceEthnicity, setRaceEthnicity] = useState<string>("");
+  const [censusRegion, setCensusRegion] = useState<string>("");
+  const [employmentStatus, setEmploymentStatus] = useState<string>("");
+  const [familySize, setFamilySize] = useState<string>("");
+  const [hasUsualSourceOfCare, setHasUsualSourceOfCare] = useState<string>("");
+  const [difficultyWalkingStairs, setDifficultyWalkingStairs] =
+    useState<string>("");
+  const [anyActivityLimitation, setAnyActivityLimitation] =
+    useState<string>("");
+  const [k6DistressScore, setK6DistressScore] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState<string>("");
   const [result, setResult] = useState<PredictResponse | null>(null);
@@ -56,8 +67,30 @@ export default function UtilizationModelTestPage() {
     setError("");
     try {
       const features: Record<string, any> = {};
-      if (age.trim()) features.age_years_2022 = Number(age);
-      if (bmi.trim()) features.bmi = Number(bmi);
+      if (age.trim()) {
+        const ageNum = Number(age);
+        const clampedAge = Math.min(120, Math.max(0, Math.floor(ageNum)));
+        features.age_years_2022 = clampedAge;
+      }
+      if (bmi.trim()) {
+        const bmiNum = Number(bmi);
+        const clampedBmi = Math.min(100, Math.max(10, bmiNum));
+        features.bmi = clampedBmi;
+      }
+      if (gender.trim()) features.gender = Number(gender);
+      if (raceEthnicity.trim()) features.race_ethnicity = Number(raceEthnicity);
+      if (censusRegion.trim()) features.census_region = Number(censusRegion);
+      if (employmentStatus.trim())
+        features.employment_status = Number(employmentStatus);
+      if (familySize.trim()) features.family_size = Number(familySize);
+      if (hasUsualSourceOfCare.trim())
+        features.has_usual_source_of_care = Number(hasUsualSourceOfCare);
+      if (difficultyWalkingStairs.trim())
+        features.difficulty_walking_stairs = Number(difficultyWalkingStairs);
+      if (anyActivityLimitation.trim())
+        features.any_activity_limitation = Number(anyActivityLimitation);
+      if (k6DistressScore.trim())
+        features.k6_distress_score = Number(k6DistressScore);
 
       const res = await fetch("/api/utilization-model/predict", {
         method: "POST",
@@ -89,7 +122,7 @@ export default function UtilizationModelTestPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Enter Minimal Features</CardTitle>
+          <CardTitle>Enter Optional Features</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -97,8 +130,21 @@ export default function UtilizationModelTestPage() {
               <Label className="text-sm">Age (years)</Label>
               <Input
                 type="number"
+                min={0}
+                max={120}
+                step={1}
                 value={age}
-                onChange={(e) => setAge(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next === "") {
+                    setAge("");
+                    return;
+                  }
+                  const num = Number(next);
+                  if (Number.isNaN(num)) return;
+                  const clamped = Math.min(120, Math.max(0, Math.floor(num)));
+                  setAge(clamped.toString());
+                }}
                 placeholder="e.g., 45"
               />
             </div>
@@ -106,9 +152,105 @@ export default function UtilizationModelTestPage() {
               <Label className="text-sm">BMI</Label>
               <Input
                 type="number"
+                min={10}
+                max={100}
+                step="any"
                 value={bmi}
-                onChange={(e) => setBmi(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next === "") {
+                    setBmi("");
+                    return;
+                  }
+                  const num = Number(next);
+                  if (Number.isNaN(num)) return;
+                  const clamped = Math.min(100, Math.max(10, num));
+                  setBmi(clamped.toString());
+                }}
                 placeholder="e.g., 27.5"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Sex (1 = Male, 2 = Female)</Label>
+              <Input
+                type="number"
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Race/Ethnicity (coded)</Label>
+              <Input
+                type="number"
+                value={raceEthnicity}
+                onChange={(e) => setRaceEthnicity(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Region (coded)</Label>
+              <Input
+                type="number"
+                value={censusRegion}
+                onChange={(e) => setCensusRegion(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Employment Status (coded)</Label>
+              <Input
+                type="number"
+                value={employmentStatus}
+                onChange={(e) => setEmploymentStatus(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Family Size</Label>
+              <Input
+                type="number"
+                value={familySize}
+                onChange={(e) => setFamilySize(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Usual Source of Care (0/1)</Label>
+              <Input
+                type="number"
+                value={hasUsualSourceOfCare}
+                onChange={(e) => setHasUsualSourceOfCare(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Difficulty Walking/Stairs (0/1)</Label>
+              <Input
+                type="number"
+                value={difficultyWalkingStairs}
+                onChange={(e) => setDifficultyWalkingStairs(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Any Activity Limitation (0/1)</Label>
+              <Input
+                type="number"
+                value={anyActivityLimitation}
+                onChange={(e) => setAnyActivityLimitation(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">
+                K6 Psychological Distress (0–24)
+              </Label>
+              <Input
+                type="number"
+                value={k6DistressScore}
+                onChange={(e) => setK6DistressScore(e.target.value)}
+                placeholder="optional"
               />
             </div>
           </div>

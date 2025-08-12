@@ -94,13 +94,61 @@ Summary
 
 ### How to run Part 1 locally
 
-Start the Python service (ensure python-models/models/v2-pkl exists):
-uvicorn python-models.server.server:app --host 127.0.0.1 --port 8001 --reload
-Configure env (optional, default is http://127.0.0.1:8001):
-.env.local: PY_UTILIZATION_BASE_URL=http://127.0.0.1:8001
-Start Next dev server:
+Quick start (recommended)
+
+1. Start the Python model server (auto-venv + install + reload):
+
+```bash
+bun run py:dev
+```
+
+Notes:
+
+- The script creates `python-models/.venv`, installs `python-models/requirements.txt`, and starts FastAPI with reload at `http://127.0.0.1:8001`.
+- To change host/port, set env vars when running: `PY_HOST=0.0.0.0 PY_PORT=8002 bun run py:dev`.
+
+2. Health check (in a second terminal):
+
+```bash
+bun run py:health
+# → {"status":"ok"}
+```
+
+3. Example prediction (age + BMI):
+
+```bash
+bun run py:predict:example
+# → { "pcp_visits": ..., "outpatient_visits": ..., ... }
+```
+
+4. Start the Next.js dev server:
+
+```bash
 bun run dev
-Test:
+```
+
+5. Test end-to-end in the app:
+
+```text
 Visit /utilization-model-test
 Click “Health Check” (should say healthy)
 Enter Age (e.g., 45) and optional BMI (e.g., 27.5), then “Predict” to see 8 outputs
+```
+
+Optional: configure API base URL (defaults to `http://127.0.0.1:8001`):
+
+```env
+# .env.local
+PY_UTILIZATION_BASE_URL=http://127.0.0.1:8001
+```
+
+Manual alternative
+
+If you prefer not to use the repo scripts, you can run uvicorn directly:
+
+```bash
+python -m venv python-models/.venv
+source python-models/.venv/bin/activate
+pip install -r python-models/requirements.txt
+uvicorn python-models.server.server:app --host 127.0.0.1 --port 8001 --reload
+```
