@@ -15,6 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useState } from "react";
 
 type PredictResponse = {
@@ -127,7 +135,7 @@ export default function UtilizationModelTestPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label className="text-sm">Age (years)</Label>
+              <Label className="text-sm">Age (years) (0-120)</Label>
               <Input
                 type="number"
                 min={0}
@@ -149,7 +157,7 @@ export default function UtilizationModelTestPage() {
               />
             </div>
             <div>
-              <Label className="text-sm">BMI</Label>
+              <Label className="text-sm">BMI (10-100)</Label>
               <Input
                 type="number"
                 min={10}
@@ -171,22 +179,42 @@ export default function UtilizationModelTestPage() {
               />
             </div>
             <div>
-              <Label className="text-sm">Sex (1 = Male, 2 = Female)</Label>
-              <Input
-                type="number"
+              <Label className="text-sm">Sex</Label>
+              <RadioGroup
                 value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                placeholder="optional"
-              />
+                onValueChange={(value) => setGender(value)}
+                className="mt-2 flex items-center gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="sex-male" value="1" />
+                  <Label htmlFor="sex-male" className="text-sm">
+                    Male
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="sex-female" value="2" />
+                  <Label htmlFor="sex-female" className="text-sm">
+                    Female
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
             <div>
-              <Label className="text-sm">Race/Ethnicity (coded)</Label>
-              <Input
-                type="number"
-                value={raceEthnicity}
-                onChange={(e) => setRaceEthnicity(e.target.value)}
-                placeholder="optional"
-              />
+              <Label className="text-sm">Race/Ethnicity</Label>
+              <Select value={raceEthnicity} onValueChange={setRaceEthnicity}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Select race/ethnicity" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">HISPANIC</SelectItem>
+                  <SelectItem value="2">NON-HISPANIC WHITE ONLY</SelectItem>
+                  <SelectItem value="3">NON-HISPANIC BLACK ONLY</SelectItem>
+                  <SelectItem value="4">NON-HISPANIC ASIAN ONLY</SelectItem>
+                  <SelectItem value="5">
+                    NON-HISPANIC OTHER RACE OR MULTIPLE RACE
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-sm">Region (coded)</Label>
