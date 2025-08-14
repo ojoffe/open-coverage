@@ -217,68 +217,143 @@ export default function UtilizationModelTestPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-sm">Region (coded)</Label>
-              <Input
-                type="number"
-                value={censusRegion}
-                onChange={(e) => setCensusRegion(e.target.value)}
-                placeholder="optional"
-              />
+              <Label className="text-sm">U.S. Region</Label>
+              <Select value={censusRegion} onValueChange={setCensusRegion}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Select region" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Northeast</SelectItem>
+                  <SelectItem value="2">Midwest</SelectItem>
+                  <SelectItem value="3">South</SelectItem>
+                  <SelectItem value="4">West</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label className="text-sm">Employment Status (coded)</Label>
-              <Input
-                type="number"
+              <Label className="text-sm">Employment Status</Label>
+              <Select
                 value={employmentStatus}
-                onChange={(e) => setEmploymentStatus(e.target.value)}
-                placeholder="optional"
-              />
+                onValueChange={setEmploymentStatus}
+              >
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Select employment status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Employed</SelectItem>
+                  <SelectItem value="2">Job To Return To</SelectItem>
+                  <SelectItem value="3">Job During</SelectItem>
+                  <SelectItem value="4">Not Employed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label className="text-sm">Family Size</Label>
+              <Label className="text-sm">Family Size (0-100)</Label>
               <Input
                 type="number"
+                min={0}
+                max={100}
+                step={1}
                 value={familySize}
-                onChange={(e) => setFamilySize(e.target.value)}
-                placeholder="optional"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next === "") {
+                    setFamilySize("");
+                    return;
+                  }
+                  const num = Number(next);
+                  if (Number.isNaN(num)) return;
+                  const clamped = Math.min(100, Math.max(0, Math.floor(num)));
+                  setFamilySize(clamped.toString());
+                }}
+                placeholder="e.g., 4"
               />
             </div>
             <div>
-              <Label className="text-sm">Usual Source of Care (0/1)</Label>
-              <Input
-                type="number"
+              <Label className="text-sm">Usual Source of Care</Label>
+              <RadioGroup
                 value={hasUsualSourceOfCare}
-                onChange={(e) => setHasUsualSourceOfCare(e.target.value)}
-                placeholder="optional"
-              />
+                onValueChange={(value) => setHasUsualSourceOfCare(value)}
+                className="mt-2 flex items-center gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="usual-care-yes" value="1" />
+                  <Label htmlFor="usual-care-yes" className="text-sm">
+                    Yes
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="usual-care-no" value="2" />
+                  <Label htmlFor="usual-care-no" className="text-sm">
+                    No
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
             <div>
-              <Label className="text-sm">Difficulty Walking/Stairs (0/1)</Label>
-              <Input
-                type="number"
+              <Label className="text-sm">Difficulty Walking/Stairs</Label>
+              <RadioGroup
                 value={difficultyWalkingStairs}
-                onChange={(e) => setDifficultyWalkingStairs(e.target.value)}
-                placeholder="optional"
-              />
+                onValueChange={(value) => setDifficultyWalkingStairs(value)}
+                className="mt-2 flex items-center gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="walking-difficulty-yes" value="1" />
+                  <Label htmlFor="walking-difficulty-yes" className="text-sm">
+                    Yes
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="walking-difficulty-no" value="2" />
+                  <Label htmlFor="walking-difficulty-no" className="text-sm">
+                    No
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
             <div>
-              <Label className="text-sm">Any Activity Limitation (0/1)</Label>
-              <Input
-                type="number"
+              <Label className="text-sm">Any Activity Limitation</Label>
+              <RadioGroup
                 value={anyActivityLimitation}
-                onChange={(e) => setAnyActivityLimitation(e.target.value)}
-                placeholder="optional"
-              />
+                onValueChange={(value) => setAnyActivityLimitation(value)}
+                className="mt-2 flex items-center gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="activity-limitation-yes" value="1" />
+                  <Label htmlFor="activity-limitation-yes" className="text-sm">
+                    Yes
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem id="activity-limitation-no" value="2" />
+                  <Label htmlFor="activity-limitation-no" className="text-sm">
+                    No
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
             <div>
               <Label className="text-sm">
-                K6 Psychological Distress (0–24)
+                K6 Psychological Distress (0-24)
               </Label>
               <Input
                 type="number"
+                min={0}
+                max={24}
+                step={1}
                 value={k6DistressScore}
-                onChange={(e) => setK6DistressScore(e.target.value)}
-                placeholder="optional"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  if (next === "") {
+                    setK6DistressScore("");
+                    return;
+                  }
+                  const num = Number(next);
+                  if (Number.isNaN(num)) return;
+                  const clamped = Math.min(24, Math.max(0, Math.floor(num)));
+                  setK6DistressScore(clamped.toString());
+                }}
+                placeholder="e.g., 8"
               />
             </div>
           </div>
