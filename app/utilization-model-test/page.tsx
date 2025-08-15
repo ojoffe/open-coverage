@@ -23,6 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { UtilizationDisplay } from "@/components/utilization-display";
+import type { Member } from "@/lib/health-profile-store";
+import type {
+  HealthcareUtilization,
+  UtilizationPrediction,
+} from "@/lib/utilization-engine";
+import { calculateRiskScore } from "@/lib/utilization-engine";
 import { useState } from "react";
 
 type PredictResponse = {
@@ -53,6 +60,105 @@ export default function UtilizationModelTestPage() {
   const [loading, setLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState<string>("");
   const [result, setResult] = useState<PredictResponse | null>(null);
+  const [utilization, setUtilization] = useState<HealthcareUtilization | null>(
+    null
+  );
+
+  function buildMemberContext(): Member {
+    const ageStr = age?.toString() ?? "";
+    const parsedAge = ageStr ? ageStr : "";
+    const parsedGender =
+      gender === "1" ? "male" : gender === "2" ? "female" : "prefer_not_to_say";
+    const bmiNum = bmi ? Number(bmi) : undefined;
+    return {
+      id: "utilization-test-member",
+      age: parsedAge,
+      gender: parsedGender as Member["gender"],
+      pregnancyStatus: undefined,
+      height: undefined,
+      weight: undefined,
+      bmi: bmiNum,
+      smokingStatus: undefined,
+      alcoholUse: undefined,
+      exerciseFrequency: undefined,
+      conditions: [],
+      medications: [],
+      allergies: [],
+      visits: [],
+      otherServices: [],
+    };
+  }
+
+  function mapToHealthcareUtilization(
+    resp: PredictResponse,
+    memberCtx: Member
+  ): HealthcareUtilization {
+    const toPred = (
+      serviceType: string,
+      annualVisits: number
+    ): UtilizationPrediction => ({
+      serviceType,
+      annualVisits,
+      severity:
+        annualVisits > 10 ? "high" : annualVisits > 5 ? "medium" : "low",
+      reason: "Model-predicted annual count",
+      basedOn: "condition",
+    });
+
+    const preds: UtilizationPrediction[] = [];
+    if (resp.pcp_visits > 0)
+      preds.push(
+        toPred(
+          "Primary care visit to treat an injury or illness",
+          resp.pcp_visits
+        )
+      );
+    if (resp.outpatient_visits > 0)
+      preds.push(toPred("Outpatient visits", resp.outpatient_visits));
+    if (resp.er_visits > 0)
+      preds.push(toPred("Emergency room care", resp.er_visits));
+    if (resp.inpatient_admits > 0)
+      preds.push(toPred("Inpatient admits", resp.inpatient_admits));
+    if (resp.home_health_visits > 0)
+      preds.push(toPred("Home health visits", resp.home_health_visits));
+    if (resp.dental_visits > 0)
+      preds.push(toPred("Dental visits", resp.dental_visits));
+    // Count Rx as medications; grouped via "drug" keyword
+    if (resp.rx_fills > 0)
+      preds.push(toPred("Prescription drugs", resp.rx_fills));
+    // Equipment purchases are not visits; omit from total visit counts and detailed cards by default
+
+    const totalVisits = preds
+      .filter((p) => !p.serviceType.toLowerCase().includes("drug"))
+      .reduce(
+        (s, p) => s + (typeof p.annualVisits === "number" ? p.annualVisits : 0),
+        0
+      );
+
+    const emergencyRisk = Math.min(
+      1,
+      (resp.er_visits + resp.inpatient_admits) / 12
+    );
+    const costCategory =
+      totalVisits > 15
+        ? "very_high"
+        : totalVisits > 10
+        ? "high"
+        : totalVisits > 5
+        ? "moderate"
+        : "low";
+    const riskAssessment = calculateRiskScore(memberCtx, emergencyRisk, preds);
+
+    return {
+      predictions: preds,
+      totalVisits,
+      emergencyRisk,
+      costCategory,
+      primaryConditions: [],
+      recommendations: [],
+      riskAssessment,
+    };
+  }
   const [error, setError] = useState<string>("");
 
   async function checkHealth() {
@@ -71,7 +177,6 @@ export default function UtilizationModelTestPage() {
 
   async function predict() {
     setLoading(true);
-    setResult(null);
     setError("");
     try {
       const features: Record<string, any> = {};
@@ -108,6 +213,13 @@ export default function UtilizationModelTestPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.detail || "Prediction failed");
       setResult(json as PredictResponse);
+      // Build utilization object for shared UI
+      const memberCtx = buildMemberContext();
+      const mapped = mapToHealthcareUtilization(
+        json as PredictResponse,
+        memberCtx
+      );
+      setUtilization(mapped);
     } catch (e: any) {
       setError(e?.message || "Prediction failed");
     } finally {
@@ -116,7 +228,7 @@ export default function UtilizationModelTestPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Utilization Model Test</h1>
         <Button variant="outline" onClick={checkHealth}>
@@ -363,48 +475,76 @@ export default function UtilizationModelTestPage() {
         </CardContent>
       </Card>
 
-      {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Predicted Annual Counts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <div className="flex justify-between">
-                <span>Primary care visits</span>
-                <span>{result.pcp_visits}</span>
+      {utilization && (
+        <>
+          {/* Predictions Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Predictions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {result &&
+                  Object.entries(result).map(([key, value]) => {
+                    // Custom label mapping for better readability
+                    const getLabel = (key: string) => {
+                      switch (key) {
+                        case "er_visits":
+                          return "ER Visits";
+                        case "pcp_visits":
+                          return "Primary Care Visits";
+                        case "outpatient_visits":
+                          return "Outpatient Visits";
+                        case "inpatient_admits":
+                          return "Inpatient Admits";
+                        case "home_health_visits":
+                          return "Home Health Visits";
+                        case "rx_fills":
+                          return "Prescription Fills";
+                        case "dental_visits":
+                          return "Dental Visits";
+                        case "equipment_purchases":
+                          return "Equipment Purchases";
+                        default:
+                          return key.replace(/_/g, " ");
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={key}
+                        className="text-center p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="text-2xl font-bold text-blue-600">
+                          {value}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {getLabel(key)}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
-              <div className="flex justify-between">
-                <span>Outpatient visits</span>
-                <span>{result.outpatient_visits}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>ER visits</span>
-                <span>{result.er_visits}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Inpatient admits</span>
-                <span>{result.inpatient_admits}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Home health visits</span>
-                <span>{result.home_health_visits}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Prescription fills</span>
-                <span>{result.rx_fills}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Dental visits</span>
-                <span>{result.dental_visits}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Durable equipment purchases</span>
-                <span>{result.equipment_purchases}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Existing Utilization Display */}
+          <UtilizationDisplay
+            utilization={utilization}
+            memberName={(() => {
+              const ageStr = age ? `${age}` : undefined;
+              const sex =
+                gender === "1" ? "Male" : gender === "2" ? "Female" : null;
+              return [
+                "Member",
+                ageStr ? `(Age ${ageStr})` : null,
+                sex ? `• ${sex}` : null,
+              ]
+                .filter(Boolean)
+                .join(" ");
+            })()}
+          />
+        </>
       )}
     </div>
   );
